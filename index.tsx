@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { UserSession, Role, Student, Question, Exam, QuestionPacket } from './types';
+import { UserSession, Role, Student, Question, Exam, QuestionPacket, SchoolSettings } from './types';
 import { MOCK_STUDENTS, MOCK_QUESTIONS, MOCK_EXAMS, CLASS_LIST, MOCK_PACKETS } from './constants';
 import { Sidebar } from './components/Sidebar';
 import { AdminDashboard } from './views/AdminDashboard';
 import { StudentDashboard } from './views/StudentDashboard';
-import { User, Lock, Crosshair, Target, AlertTriangle, ChevronRight, ChevronDown } from 'lucide-react';
+import { User, Lock, Crosshair, Target, AlertTriangle, ChevronRight, ChevronDown, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+
+const DEFAULT_SETTINGS: SchoolSettings = {
+  schoolName: 'SMPN 3 Pacet',
+  academicYear: '2024/2025',
+  semester: 'Ganjil',
+  adminPassword: 'admin123'
+};
+
+// --- CONFIGURATION ---
+// Masukkan URL Google Apps Script Web App Anda di sini agar aplikasi online
+const APPS_SCRIPT_URL = ""; 
 
 const App = () => {
   // Helper hook for localStorage persistence
@@ -37,48 +48,89 @@ const App = () => {
   // Data State with Persistence (localStorage)
   const [students, setStudents] = usePersistentState<Student[]>('cbt_students', MOCK_STUDENTS);
   const [questions, setQuestions] = usePersistentState<Question[]>('cbt_questions', MOCK_QUESTIONS);
-  const [exams, setExams] = usePersistentState<Exam[]>('cbt_exams', []); // Start empty, created by admin
+  const [exams, setExams] = usePersistentState<Exam[]>('cbt_exams', []); 
   const [packets, setPackets] = usePersistentState<QuestionPacket[]>('cbt_packets', MOCK_PACKETS);
+  const [schoolSettings, setSchoolSettings] = usePersistentState<SchoolSettings>('cbt_settings', DEFAULT_SETTINGS);
+
+  // Server Connection State
+  const [isConnected, setIsConnected] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Login Form State
   const [loginRole, setLoginRole] = useState<Role>(Role.STUDENT);
-  
-  // Admin Login State
-  const [selectedAdminUser, setSelectedAdminUser] = useState('admin'); // Changed from text input to select state
+  const [selectedAdminUser, setSelectedAdminUser] = useState('admin'); 
   const [adminPass, setAdminPass] = useState('');
-  
-  // Student Login State
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  
   const [loginError, setLoginError] = useState('');
+
+  // --- SYNC ENGINE ---
+  // Coba ambil data dari server saat aplikasi dimuat
+  useEffect(() => {
+      if(APPS_SCRIPT_URL) {
+          fetchDataFromServer();
+      }
+  }, []);
+
+  const fetchDataFromServer = async () => {
+      if(!APPS_SCRIPT_URL) return;
+      setIsSyncing(true);
+      try {
+          const res = await fetch(`${APPS_SCRIPT_URL}?action=read`);
+          const json = await res.json();
+          if(json.status === 'success') {
+              // Update state from server data if not empty
+              if(json.data.Students?.length) setStudents(json.data.Students);
+              if(json.data.Questions?.length) setQuestions(json.data.Questions);
+              if(json.data.Packets?.length) setPackets(json.data.Packets);
+              if(json.data.Exams?.length) setExams(json.data.Exams);
+              
+              // Handle Settings mapping
+              if(json.data.Settings?.length) {
+                  const s = json.data.Settings;
+                  // Simple mapping assuming order or key value pair logic in sheet
+                  // For now, we keep local settings or map manually if structure matches
+              }
+              setIsConnected(true);
+          }
+      } catch (err) {
+          console.error("Failed to connect to server:", err);
+          setIsConnected(false);
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
+  // Sync manual trigger
+  const handleSync = () => {
+      fetchDataFromServer();
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
     if (loginRole === Role.ADMIN) {
-      // Logic Login Admin / Guru
       if (selectedAdminUser === 'admin') {
-        if (adminPass === 'admin123') {
+        if (adminPass === schoolSettings.adminPassword) {
            setSession({ role: Role.ADMIN, name: 'Administrator', id: 'admin' });
            setActiveTab('dashboard');
         } else {
-           setLoginError('Password Salah (Hint: admin123)');
+           setLoginError('Password Salah');
         }
       } else if (selectedAdminUser === 'guru_numerasi') {
-         if (adminPass === 'guru 123') { // Note: space included as per prompt
+         if (adminPass === 'guru 123') { 
            setSession({ role: Role.TEACHER_NUMERASI, name: 'Guru Numerasi', id: 'guru_num' });
-           setActiveTab('questions'); // Guru only sees questions
+           setActiveTab('questions'); 
         } else {
            setLoginError('Password Salah (Hint: guru 123)');
         }
       } else if (selectedAdminUser === 'guru_literasi') {
          if (adminPass === 'guru123') {
            setSession({ role: Role.TEACHER_LITERASI, name: 'Guru Literasi', id: 'guru_lit' });
-           setActiveTab('questions'); // Guru only sees questions
+           setActiveTab('questions');
         } else {
            setLoginError('Password Salah (Hint: guru123)');
         }
@@ -121,6 +173,23 @@ const App = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black pointer-events-none"></div>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-600/10 via-slate-900/50 to-black pointer-events-none"></div>
 
+        {/* Server Status Indicator */}
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
+            {isSyncing ? (
+                <div className="bg-blue-900/50 text-blue-300 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/30 flex items-center gap-2">
+                    <RefreshCw size={12} className="animate-spin"/> Syncing...
+                </div>
+            ) : isConnected ? (
+                <div className="bg-green-900/50 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30 flex items-center gap-2">
+                    <Cloud size={12}/> Terkoneksi dengan Server
+                </div>
+            ) : (
+                <div className="bg-red-900/50 text-red-400 px-3 py-1 rounded-full text-xs font-bold border border-red-500/30 flex items-center gap-2 cursor-pointer" onClick={handleSync} title="Klik untuk refresh">
+                    <CloudOff size={12}/> Offline (Local Mode)
+                </div>
+            )}
+        </div>
+
         {/* Floating Particles/Decorations */}
         <div className="absolute top-10 left-10 text-yellow-500/20 animate-pulse"><Crosshair size={100} /></div>
         <div className="absolute bottom-20 right-10 text-yellow-500/20 animate-pulse delay-700"><Target size={120} /></div>
@@ -138,7 +207,7 @@ const App = () => {
              <div className="inline-block bg-yellow-500 text-black px-6 py-2 transform -skew-x-12 border-2 border-white/20 shadow-[0_0_20px_rgba(234,179,8,0.5)]">
                 <h1 className="text-2xl font-black italic tracking-tighter transform skew-x-12 uppercase">CBT BATTLE</h1>
              </div>
-             <p className="mt-3 text-slate-400 text-sm font-mono tracking-[0.3em] uppercase">SMPN 3 Pacet</p>
+             <p className="mt-3 text-slate-400 text-sm font-mono tracking-[0.3em] uppercase">{schoolSettings.schoolName}</p>
           </div>
 
           <div 
@@ -290,7 +359,7 @@ const App = () => {
         
         {/* Sidebar - Only show for ADMIN/TEACHER */}
         {session.role !== Role.STUDENT && (
-          <div className="flex-none z-20">
+          <div className="flex-none z-20 h-full">
              <Sidebar 
                user={session} 
                activeTab={activeTab} 
@@ -318,6 +387,8 @@ const App = () => {
                     setExams={setExams}
                     packets={packets}
                     setPackets={setPackets}
+                    schoolSettings={schoolSettings}
+                    setSchoolSettings={setSchoolSettings}
                   />
                 )}
                 {session.role === Role.STUDENT && session.details && (

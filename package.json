@@ -14,7 +14,9 @@
     "react-dom": "^19.2.4",
     "react": "^19.2.4",
     "xlsx": "latest",
-    "mammoth": "1.6.0"
+    "mammoth": "1.6.0",
+    "jspdf": "2.5.1",
+    "jspdf-autotable": "3.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

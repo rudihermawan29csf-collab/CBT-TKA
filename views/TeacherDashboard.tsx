@@ -31,7 +31,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   // Exam Management State
   const [newExam, setNewExam] = useState<Partial<Exam>>({
     title: '',
-    subject: teacher.subject,
     durationMinutes: 60,
     classTarget: [],
     questions: [],
@@ -125,7 +124,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const handleCreateExam = () => {
     if (newExam.title && newExam.classTarget && newExam.classTarget.length > 0) {
       setExams([...exams, { ...newExam, id: `exam-${Date.now()}`, questions: questions } as Exam]);
-      setNewExam({ title: '', subject: teacher.subject, durationMinutes: 60, classTarget: [], questions: [], isActive: false });
+      setNewExam({ title: '', durationMinutes: 60, classTarget: [], questions: [], isActive: false });
       alert("Jadwal Ujian berhasil dibuat!");
     }
   };
@@ -366,6 +365,5 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
 }

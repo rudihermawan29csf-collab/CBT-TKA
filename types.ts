@@ -16,6 +16,13 @@ export enum QuestionCategory {
   NUMERASI = 'Numerasi'
 }
 
+export interface SchoolSettings {
+  schoolName: string;
+  academicYear: string;
+  semester: string;
+  adminPassword: string;
+}
+
 export interface Student {
   id: string;
   no: number;
