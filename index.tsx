@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 
 // --- CONFIGURATION ---
 // Masukkan URL Google Apps Script Web App Anda di sini agar aplikasi online
-const APPS_SCRIPT_URL = ""; 
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwcfARF7u86QmGBjdZYtm643iElF-uYm9oVMKetdo_17GBWWY-YW7aqySp2JhdhhIqJdQ/exec"; 
 
 const App = () => {
   // Helper hook for localStorage persistence
@@ -121,18 +121,18 @@ const App = () => {
            setLoginError('Password Salah');
         }
       } else if (selectedAdminUser === 'guru_numerasi') {
-         if (adminPass === 'guru 123') { 
+         if (adminPass === 'guru123') { 
            setSession({ role: Role.TEACHER_NUMERASI, name: 'Guru Numerasi', id: 'guru_num' });
            setActiveTab('questions'); 
         } else {
-           setLoginError('Password Salah (Hint: guru 123)');
+           setLoginError('Password Salah');
         }
       } else if (selectedAdminUser === 'guru_literasi') {
          if (adminPass === 'guru123') {
            setSession({ role: Role.TEACHER_LITERASI, name: 'Guru Literasi', id: 'guru_lit' });
            setActiveTab('questions');
         } else {
-           setLoginError('Password Salah (Hint: guru123)');
+           setLoginError('Password Salah');
         }
       } else {
          setLoginError('User tidak valid.');

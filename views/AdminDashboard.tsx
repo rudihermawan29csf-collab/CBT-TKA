@@ -1573,6 +1573,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                  <option value={QuestionType.COMPLEX}>Pilihan Ganda Kompleks</option>
                                                  <option value={QuestionType.MATCHING}>Menjodohkan (Tabel)</option>
                                              </select>
+                                             <button onClick={() => setActiveSlot(null)} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded ml-2" title="Tutup Editor"><X size={16}/></button>
                                          </div>
                                      </div>
 
@@ -1749,10 +1750,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                      </div>
                                  </div>
                              ) : (
-                                 <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-10">
-                                     <ArrowRight size={48} className="rotate-180 md:rotate-0 mb-4 opacity-20"/>
-                                     <p className="text-sm font-bold uppercase tracking-widest">Pilih nomor soal di navigator untuk mulai mengedit.</p>
-                                 </div>
+                                <div className="p-6 space-y-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-white text-lg">Preview Soal Paket: {selectedPacket?.name}</h3>
+                                        <div className="text-xs text-slate-400 font-mono bg-black/40 px-2 py-1 rounded border border-slate-700">Total: <span className="text-white font-bold">{questions.filter(q => q.packetId === selectedPacketId).length}</span> / {selectedPacket?.totalQuestions}</div>
+                                    </div>
+                                    
+                                    {questions.filter(q => q.packetId === selectedPacketId).sort((a,b) => (a.number || 0) - (b.number || 0)).map(q => (
+                                        <div key={q.id} className="bg-black/40 border border-slate-700 p-4 rounded hover:border-slate-500 transition-all group relative">
+                                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => prepareSlotForm(q.number || 0)} className="p-2 bg-blue-600 text-white rounded hover:bg-blue-500 shadow-lg"><Edit2 size={16}/></button>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <span className="flex-none w-8 h-8 bg-slate-800 text-yellow-500 font-black flex items-center justify-center rounded border border-slate-700">{q.number}</span>
+                                                <div className="flex-1">
+                                                    {q.image && <img src={q.image} className="max-h-32 rounded mb-2 border border-slate-700" alt="Soal"/>}
+                                                    <p className="text-white font-medium mb-2 whitespace-pre-wrap text-sm leading-relaxed">{q.text}</p>
+                                                    
+                                                    {/* Render Options Preview based on Type */}
+                                                    <div className="text-xs text-slate-400 space-y-1">
+                                                        {q.type === QuestionType.SINGLE && q.options?.map((opt, i) => (
+                                                            <div key={i} className={`flex items-center gap-2 ${i === q.correctAnswerIndex ? 'text-green-400 font-bold' : ''}`}>
+                                                                <span className={`w-4 h-4 border flex items-center justify-center rounded-full text-[10px] ${i === q.correctAnswerIndex ? 'border-green-500 bg-green-900/20' : 'border-slate-600'}`}>{String.fromCharCode(65+i)}</span>
+                                                                <span>{opt}</span>
+                                                                {i === q.correctAnswerIndex && <Check size={12}/>}
+                                                            </div>
+                                                        ))}
+                                                        {q.type === QuestionType.COMPLEX && q.options?.map((opt, i) => (
+                                                            <div key={i} className={`flex items-center gap-2 ${(q.correctAnswerIndices || []).includes(i) ? 'text-blue-400 font-bold' : ''}`}>
+                                                                <span className={`w-4 h-4 border flex items-center justify-center rounded-sm text-[10px] ${(q.correctAnswerIndices || []).includes(i) ? 'border-blue-500 bg-blue-900/20' : 'border-slate-600'}`}>{(q.correctAnswerIndices || []).includes(i) ? <Check size={10}/> : ''}</span>
+                                                                <span>{opt}</span>
+                                                            </div>
+                                                        ))}
+                                                        {q.type === QuestionType.MATCHING && (
+                                                            <div className="grid grid-cols-1 gap-1 mt-2">
+                                                                {q.matchingPairs?.map((pair, idx) => (
+                                                                    <div key={idx} className="flex items-center gap-2 text-[10px]">
+                                                                        <span className="text-slate-500">{pair.left}</span>
+                                                                        <ArrowRight size={10} className="text-slate-600"/>
+                                                                        <span className="text-yellow-500 font-bold">{pair.right}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    
+                                    {questions.filter(q => q.packetId === selectedPacketId).length === 0 && (
+                                         <div className="text-center text-slate-500 py-10 border-2 border-dashed border-slate-800 bg-black/20 rounded">
+                                             <p className="text-sm font-bold uppercase tracking-widest mb-2">Paket Masih Kosong</p>
+                                             <p className="text-xs">Klik nomor pada navigator di sebelah kiri untuk mulai membuat soal.</p>
+                                         </div>
+                                    )}
+                                </div>
                              )}
                          </div>
                      </div>
