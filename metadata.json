@@ -1,0 +1,5 @@
+{
+  "name": "CBT SMPN 3 Pacet",
+  "description": "A Computer Based Test (CBT) application for SMPN 3 Pacet featuring Admin, Teacher, and Student portals with AI-assisted question generation.",
+  "requestFramePermissions": []
+}
