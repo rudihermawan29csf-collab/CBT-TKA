@@ -21,6 +21,8 @@ export interface SchoolSettings {
   academicYear: string;
   semester: string;
   adminPassword: string;
+  teacherLiterasiPassword?: string; // New
+  teacherNumerasiPassword?: string; // New
 }
 
 export interface Student {
@@ -75,6 +77,20 @@ export interface Exam {
   classTarget: string[];
   questions: Question[]; 
   isActive: boolean;
+}
+
+export interface ExamResult {
+  id: string;
+  examId: string;
+  examTitle: string;
+  studentId: string;
+  studentName: string;
+  studentClass: string;
+  score: number;
+  literasiScore: number;
+  numerasiScore: number;
+  answers: Record<string, any>; // Stores user answers
+  timestamp: string;
 }
 
 export interface UserSession {

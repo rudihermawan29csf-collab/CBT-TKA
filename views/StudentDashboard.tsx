@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Student, Exam, Question, QuestionType, QuestionCategory } from '../types';
+import { Student, Exam, Question, QuestionType, QuestionCategory, ExamResult } from '../types';
 import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -7,49 +7,17 @@ interface StudentDashboardProps {
   exams: Exam[];
   activeTab: string;
   onLogout?: () => void;
+  examResults: ExamResult[]; // NEW: Receive Results
+  onSaveResult: (result: ExamResult) => void; // NEW: Save Function
 }
 
-// Helper to simulate history data since we don't have a backend
-const getMockHistory = (student: Student, exams: Exam[]) => {
-  return exams.slice(0, 1).map(exam => {
-     let correctCount = 0;
-     let literasiCorrect = 0;
-     let numerasiCorrect = 0;
-     let literasiTotal = 0;
-     let numerasiTotal = 0;
-     const answers: Record<string, boolean> = {};
-
-     exam.questions.forEach((q, idx) => {
-        const isLiterasi = q.category === QuestionCategory.LITERASI || (!q.category && idx % 2 === 0);
-        if (isLiterasi) literasiTotal++; else numerasiTotal++;
-
-        const isCorrect = (parseInt(student.nis) + idx) % 3 !== 0; 
-        answers[q.id] = isCorrect;
-
-        if (isCorrect) {
-          correctCount++;
-          if (isLiterasi) literasiCorrect++; else numerasiCorrect++;
-        }
-     });
-
-     return {
-       exam,
-       score: (correctCount / exam.questions.length) * 100,
-       literasiScore: literasiTotal ? (literasiCorrect / literasiTotal) * 100 : 0,
-       numerasiScore: numerasiTotal ? (numerasiCorrect / numerasiTotal) * 100 : 0,
-       answers
-     };
-  });
-};
-
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exams, activeTab, onLogout }) => {
+export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exams, activeTab, onLogout, examResults, onSaveResult }) => {
   // --- INTRO FLOW STATE ---
-  // 0: Welcome, 2: Rules, 3: Lobby (Dashboard) - Step 1 (Character Select) removed
   const [introStep, setIntroStep] = useState(0); 
 
   const [activeExam, setActiveExam] = useState<Exam | null>(null);
   const [menuTab, setMenuTab] = useState<'LOBBY' | 'CAREER'>('LOBBY');
-  const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<ExamResult | null>(null);
 
   // Exam State
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -57,7 +25,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   const [doubts, setDoubts] = useState<Set<string>>(new Set());
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [showFinishConfirm, setShowFinishConfirm] = useState(false); // New state for confirmation modal
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [score, setScore] = useState(0);
   
   // Anti-Cheat State
@@ -69,14 +37,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const navScrollRef = useRef<HTMLDivElement>(null);
 
-  // Filter exams: Show ALL exams for the student's class, even if time is not valid yet
+  // Filter exams: Show ALL exams for the student's class
   const studentExams = exams.filter((e) => {
       const isTargetClass = e.classTarget.includes(student.class);
       const isActiveStatus = e.isActive;
       return isActiveStatus && isTargetClass;
   });
 
-  const historyData = useMemo(() => getMockHistory(student, exams), [student, exams]);
+  // FILTERED HISTORY FROM PROPS (Actual Results)
+  const myHistory = useMemo(() => {
+      return examResults.filter(r => r.studentId === student.id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [examResults, student.id]);
 
   useEffect(() => {
     if (activeExam && navScrollRef.current) {
@@ -111,13 +82,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
         if (document.hidden) {
             setViolationCount(prev => {
                 const newCount = prev + 1;
-                
-                // Jika sudah 3 kali, langsung Auto Finish & Disqualify
                 if (newCount >= 3) {
                     handleSubmitExam(true); 
                     return newCount; 
                 } else {
-                    // Peringatan ke-1 dan ke-2
                     setShowViolationWarning(true);
                     return newCount;
                 }
@@ -138,6 +106,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   };
 
   const handleStartExam = (exam: Exam) => {
+    // Check if already taken
+    const existing = myHistory.find(h => h.examId === exam.id);
+    if (existing) {
+        alert("Anda sudah mengerjakan ujian ini!");
+        return;
+    }
+
     setActiveExam(exam);
     setTimeLeft(exam.durationMinutes * 60);
     setCurrentQuestionIndex(0);
@@ -180,19 +155,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
     setDoubts(newDoubts);
   };
 
-  // --- UPDATED NEXT LOGIC ---
   const handleSaveAndNext = (qId: string) => {
     if (activeExam) {
         if (currentQuestionIndex < activeExam.questions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
         } else {
-            // Jika soal terakhir, beri peringatan
             alert("Ini adalah soal terakhir. Silahkan di cek jawaban terlebih dahulu sebelum menekan tombol Finish.");
         }
     }
   };
 
-  // --- NEW FINISH BUTTON CLICK ---
   const handleFinishClick = () => {
       setShowFinishConfirm(true);
   };
@@ -200,42 +172,73 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   const handleSubmitExam = (forceDisqualify = false) => {
     if (!activeExam) return;
     let correctCount = 0;
+    let literasiTotal = 0;
+    let literasiCorrect = 0;
+    let numerasiTotal = 0;
+    let numerasiCorrect = 0;
+
     activeExam.questions.forEach((q) => {
+      let isCorrect = false;
       const userAnswer = answers[q.id];
+      const isLiterasi = q.category === QuestionCategory.LITERASI;
+      if (isLiterasi) literasiTotal++; else numerasiTotal++;
+
       if (q.type === QuestionType.SINGLE) {
-        if (userAnswer === q.correctAnswerIndex) correctCount++;
+        if (userAnswer === q.correctAnswerIndex) isCorrect = true;
       } 
       else if (q.type === QuestionType.COMPLEX) {
         const userSet = new Set(userAnswer as number[]);
         const correctSet = new Set(q.correctAnswerIndices);
+        // Strict match
         if (userSet.size === correctSet.size && [...userSet].every(x => correctSet.has(x))) {
-            correctCount++;
+            isCorrect = true;
         }
       } 
       else if (q.type === QuestionType.MATCHING) {
           const userPairs = userAnswer as Record<string, string>;
           if (userPairs && q.matchingPairs) {
              const allCorrect = q.matchingPairs.every(pair => userPairs[pair.left] === pair.right);
-             if (allCorrect) correctCount++;
+             if (allCorrect) isCorrect = true;
           }
       }
+
+      if (isCorrect) {
+          correctCount++;
+          if (isLiterasi) literasiCorrect++; else numerasiCorrect++;
+      }
     });
-    const calculatedScore = (correctCount / activeExam.questions.length) * 100;
+
+    const calculatedScore = activeExam.questions.length > 0 ? (correctCount / activeExam.questions.length) * 100 : 0;
+    const litScore = literasiTotal > 0 ? (literasiCorrect / literasiTotal) * 100 : 0;
+    const numScore = numerasiTotal > 0 ? (numerasiCorrect / numerasiTotal) * 100 : 0;
+
     setScore(calculatedScore);
     setShowFinishConfirm(false);
     
     if (forceDisqualify) {
         setIsDisqualified(true);
-        // Force violation count to display max for feedback
         setViolationCount(3);
         setShowViolationWarning(false); 
     }
     
+    // SAVE REAL RESULT
+    const resultData: ExamResult = {
+        id: `res-${Date.now()}`,
+        examId: activeExam.id,
+        examTitle: activeExam.title,
+        studentId: student.id,
+        studentName: student.name,
+        studentClass: student.class,
+        score: calculatedScore,
+        literasiScore: litScore,
+        numerasiScore: numScore,
+        answers: answers,
+        timestamp: new Date().toISOString()
+    };
+    
+    onSaveResult(resultData);
     setIsSubmitted(true);
   };
-
-  // ... (Question Renderers: renderSingleChoice, renderComplexChoice, renderMatching, renderQuestionNavGrid - unchanged)
-  // ... (Intro flow renders - unchanged)
 
   const renderSingleChoice = (q: Question) => (
     <div className="space-y-4">
@@ -269,7 +272,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
   const renderComplexChoice = (q: Question) => {
     const neededAnswers = q.correctAnswerIndices?.length || 0;
-    const currentSelected = (answers[q.id] as number[])?.length || 0;
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-2 mb-2 bg-slate-800/80 p-2 rounded border-l-4 border-blue-500 w-fit">
@@ -418,7 +420,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                       <div className="h-1 w-24 bg-yellow-500 mx-auto mt-4 rounded-full animate-fade-in-up animate-delay-200"></div>
                    </div>
                    <p className="text-slate-400 text-lg md:text-xl font-mono uppercase tracking-[0.3em] mb-12 animate-fade-in-up animate-delay-400">CBT Battle Arena • SMPN 3 Pacet</p>
-                   {/* CHANGED: setIntroStep(1) to setIntroStep(2) to skip character selection */}
                    <button onClick={() => setIntroStep(2)} className="group relative px-12 py-5 bg-gradient-to-r from-yellow-600 to-yellow-500 text-black font-black text-xl uppercase tracking-widest hover:from-yellow-500 hover:to-yellow-400 transform hover:scale-105 transition-all skew-x-[-12deg] shadow-[0_0_30px_rgba(234,179,8,0.4)] animate-fade-in-up animate-delay-400">
                        <span className="skew-x-[12deg] inline-block flex items-center gap-3">Mulai Misi <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform"/></span>
                    </button>
@@ -426,8 +427,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
           </div>
       );
   }
-
-  // INTRO STEP 1 (CHARACTER SELECTION) REMOVED
 
   if (introStep === 2) { /* Rules Screen Code */
       return (
@@ -448,7 +447,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       );
   }
 
-  // 1. RESULT SCREEN (Victory/Booyah/Eliminated)
+  // 1. RESULT SCREEN
   if (isSubmitted && activeExam) {
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
@@ -599,9 +598,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
             </button>
           </div>
         </div>
-
-        {/* ... (Rest of the Navigation and Questions UI remains mostly identical) ... */}
-        {/* Skipping repetitive UI code for brevity while maintaining the core logic changes above */}
         
         {/* --- NEW: Horizontal Navigation Strip (Mobile Only) --- */}
         <div className="lg:hidden w-full bg-slate-900 border-b border-white/10 z-10 flex items-center">
@@ -709,7 +705,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
     );
   }
 
-  // 3. DASHBOARD (LOBBY & CAREER) - Main Layout
+  // 3. DASHBOARD (LOBBY & CAREER)
   return (
     <div className="h-full flex flex-col md:flex-row bg-slate-950 text-white font-sans relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center opacity-20 pointer-events-none"></div>
@@ -766,12 +762,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                     const end = new Date(exam.scheduledEnd);
                                     const isTimeValid = now >= start && now <= end;
                                     const isEnded = now > end;
+                                    const isDone = myHistory.some(h => h.examId === exam.id); // Check if done
+
                                     return (
-                                        <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid ? 'hover:border-yellow-500' : 'opacity-75 grayscale'}`}>
+                                        <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid && !isDone ? 'hover:border-yellow-500' : 'opacity-75 grayscale'}`}>
                                             <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none"></div>
                                             <div className="p-5">
                                                 <div className="flex justify-between items-start mb-3">
-                                                    <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded">Ranked</span>
+                                                    {isDone ? (
+                                                        <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1"><Check size={10}/> Completed</span>
+                                                    ) : (
+                                                        <span className="bg-blue-900/40 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded">Ranked</span>
+                                                    )}
                                                     <Clock size={14} className="text-slate-500"/>
                                                 </div>
                                                 <h3 className="text-lg font-black text-white uppercase italic tracking-wide mb-1 leading-tight group-hover:text-yellow-400 transition-colors">{exam.title}</h3>
@@ -780,7 +782,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                                     <span className="flex items-center gap-1"><Target size={12}/> {exam.questions.length} Qs</span>
                                                     <span className="flex items-center gap-1"><Clock size={12}/> {exam.durationMinutes}m</span>
                                                 </div>
-                                                {isTimeValid ? (
+                                                {isDone ? (
+                                                    <button disabled className="w-full py-3 bg-emerald-900/30 text-emerald-500 font-black uppercase tracking-widest text-xs rounded border border-emerald-900/50 cursor-default">Mission Accomplished</button>
+                                                ) : isTimeValid ? (
                                                     <button onClick={() => handleStartExam(exam)} className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-black font-black uppercase tracking-widest text-xs rounded transition-all active:scale-95 shadow-md flex items-center justify-center gap-2">Start Mission <ChevronRight size={14}/></button>
                                                 ) : (
                                                     <button disabled className="w-full py-3 bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs rounded flex items-center justify-center gap-2 cursor-not-allowed">{isEnded ? 'Mission Ended' : 'Coming Soon'}</button>
@@ -802,13 +806,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                         <div className="flex flex-col lg:flex-row gap-6 h-full">
                             <div className={`${selectedHistory ? 'hidden lg:block lg:w-1/3' : 'w-full'} transition-all`}>
                                 <div className="space-y-3">
-                                    {historyData.map((item: any, idx: number) => (
+                                    {myHistory.map((item, idx) => (
                                         <div key={idx} onClick={() => setSelectedHistory(item)} className={`p-4 border rounded-xl cursor-pointer transition-all relative overflow-hidden ${selectedHistory === item ? 'bg-yellow-500/10 border-yellow-500' : 'bg-slate-900 border-slate-700 hover:bg-slate-800'}`}>
                                             <div className="flex justify-between items-center relative z-10">
                                                 <div className="flex items-center gap-4">
                                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs border ${item.score >= 75 ? 'bg-yellow-500 text-black border-yellow-400' : 'bg-slate-700 text-white border-slate-600'}`}>{Math.round(item.score)}</div>
                                                     <div>
-                                                        <h4 className={`font-bold text-sm uppercase ${selectedHistory === item ? 'text-yellow-400' : 'text-slate-200'}`}>{item.exam.title}</h4>
+                                                        <h4 className={`font-bold text-sm uppercase ${selectedHistory === item ? 'text-yellow-400' : 'text-slate-200'}`}>{item.examTitle}</h4>
                                                         <div className="flex gap-2 mt-1">
                                                             <span className="text-[10px] px-1 bg-purple-900/50 text-purple-300 rounded border border-purple-500/30">L: {Math.round(item.literasiScore)}</span>
                                                             <span className="text-[10px] px-1 bg-orange-900/50 text-orange-300 rounded border border-orange-500/30">N: {Math.round(item.numerasiScore)}</span>
@@ -819,7 +823,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                             </div>
                                         </div>
                                     ))}
-                                    {historyData.length === 0 && <div className="text-center p-8 text-slate-500 italic border border-dashed border-slate-700 rounded-xl">No battle history found.</div>}
+                                    {myHistory.length === 0 && <div className="text-center p-8 text-slate-500 italic border border-dashed border-slate-700 rounded-xl">No battle history found.</div>}
                                 </div>
                             </div>
                             {selectedHistory && (
@@ -846,21 +850,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                                  <p className="text-2xl font-black text-white">{Math.round(selectedHistory.numerasiScore)}%</p>
                                              </div>
                                          </div>
-                                         <h4 className="text-xs text-slate-500 font-bold uppercase mb-4 border-b border-slate-800 pb-2">Question Analysis</h4>
-                                         <div className="space-y-2">
-                                             {selectedHistory.exam.questions.map((q: Question, qIdx: number) => {
-                                                 const isCorrect = selectedHistory.answers[q.id];
-                                                 return (
-                                                     <div key={q.id} className="flex items-start gap-3 p-3 rounded bg-black/20 border border-slate-800/50">
-                                                         <div className={`mt-0.5 w-5 h-5 flex-none rounded flex items-center justify-center text-[10px] font-bold ${isCorrect ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'}`}>{isCorrect ? <Check size={12}/> : <X size={12}/>}</div>
-                                                         <div className="flex-1 min-w-0">
-                                                             <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{q.text}</p>
-                                                             <div className="flex gap-2 mt-1"><span className="text-[9px] text-slate-500 uppercase font-mono">#{qIdx + 1}</span><span className={`text-[9px] uppercase px-1 rounded ${q.category === QuestionCategory.NUMERASI ? 'text-orange-400 bg-orange-900/20' : 'text-purple-400 bg-purple-900/20'}`}>{q.category || 'General'}</span></div>
-                                                         </div>
-                                                     </div>
-                                                 )
-                                             })}
-                                         </div>
+                                         <div className="text-center text-xs text-slate-500">Detail jawaban disimpan di server untuk dianalisis oleh admin.</div>
                                      </div>
                                 </div>
                             )}
