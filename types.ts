@@ -18,11 +18,12 @@ export enum QuestionCategory {
 
 export interface SchoolSettings {
   schoolName: string;
+  cbtTitle?: string; // New: Configurable Login Title
   academicYear: string;
   semester: string;
   adminPassword: string;
-  teacherLiterasiPassword?: string; // New
-  teacherNumerasiPassword?: string; // New
+  teacherLiterasiPassword?: string; 
+  teacherNumerasiPassword?: string; 
 }
 
 export interface Student {
@@ -91,6 +92,8 @@ export interface ExamResult {
   numerasiScore: number;
   answers: Record<string, any>; // Stores user answers
   timestamp: string;
+  violationCount?: number; // New: Track window blur/tab switch counts
+  isDisqualified?: boolean; // New: Track if student was kicked out
 }
 
 export interface UserSession {

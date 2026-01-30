@@ -9,6 +9,7 @@ import { User, Lock, Crosshair, Target, AlertTriangle, ChevronRight, ChevronDown
 
 const DEFAULT_SETTINGS: SchoolSettings = {
   schoolName: 'SMPN 3 Pacet',
+  cbtTitle: 'CBT BATTLE', // Default Title
   academicYear: '2024/2025',
   semester: 'Ganjil',
   adminPassword: 'admin123',
@@ -259,7 +260,7 @@ const App = () => {
                 </div>
              </div>
              <div className="inline-block bg-yellow-500 text-black px-6 py-2 transform -skew-x-12 border-2 border-white/20 shadow-[0_0_20px_rgba(234,179,8,0.5)]">
-                <h1 className="text-2xl font-black italic tracking-tighter transform skew-x-12 uppercase">CBT BATTLE</h1>
+                <h1 className="text-2xl font-black italic tracking-tighter transform skew-x-12 uppercase">{schoolSettings?.cbtTitle || 'CBT BATTLE'}</h1>
              </div>
              <p className="mt-3 text-slate-400 text-sm font-mono tracking-[0.3em] uppercase">{schoolSettings.schoolName}</p>
           </div>

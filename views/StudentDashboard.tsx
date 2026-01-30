@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Student, Exam, Question, QuestionType, QuestionCategory, ExamResult } from '../types';
-import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock, Square, Calendar } from 'lucide-react';
 
 interface StudentDashboardProps {
   student: Student;
@@ -283,7 +283,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
         literasiScore: litScore,
         numerasiScore: numScore,
         answers: answers, 
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        violationCount: forceDisqualify ? 3 : violationCount, // Pass violation data
+        isDisqualified: forceDisqualify || isDisqualified // Pass disqualification data
     };
     
     onSaveResult(resultData);
@@ -305,12 +307,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
             }`}
             style={{ clipPath: 'polygon(0 0, 100% 0, 98% 100%, 0% 100%)' }}
           >
-            <div className={`w-10 h-10 flex items-center justify-center mr-5 font-bold font-mono text-lg transition-colors border-2 transform -skew-x-12 ${
+            <div className={`w-10 h-10 flex items-center justify-center mr-5 font-bold font-mono text-lg transition-colors border-2 transform -skew-x-12 shrink-0 ${
                 isSelected ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-transparent border-slate-500 text-slate-400 group-hover:border-yellow-500 group-hover:text-yellow-500'
             }`}>
               <span className="transform skew-x-12">{String.fromCharCode(65 + idx)}</span>
             </div>
-            <span className={`text-lg font-medium tracking-wide ${isSelected ? 'text-yellow-400' : 'text-slate-300 group-hover:text-white'}`}>
+            <span className={`text-lg font-medium leading-relaxed ${isSelected ? 'text-yellow-400' : 'text-slate-300 group-hover:text-white'}`}>
                 {option}
             </span>
             {isSelected && <div className="absolute right-0 top-0 bottom-0 w-2 bg-gradient-to-l from-yellow-500/50 to-transparent"></div>}
@@ -344,12 +346,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                         : 'bg-slate-800/50 border border-slate-700 hover:border-blue-400'
                     }`}
                     >
-                    <div className={`w-6 h-6 border-2 mr-5 flex items-center justify-center transition-all ${
+                    <div className={`w-8 h-8 mr-5 flex items-center justify-center transition-all shrink-0 rounded-md border-2 ${
                         isSelected ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-500 bg-transparent group-hover:border-blue-400'
                     }`}>
-                        {isSelected && <Check size={16} strokeWidth={4} />}
+                        {isSelected ? <Check size={20} strokeWidth={4} /> : null}
                     </div>
-                    <span className={`text-lg font-medium ${isSelected ? 'text-blue-200' : 'text-slate-300 group-hover:text-white'}`}>
+                    <span className={`text-lg font-medium leading-relaxed ${isSelected ? 'text-blue-200' : 'text-slate-300 group-hover:text-white'}`}>
                         {option}
                     </span>
                     </button>
@@ -382,7 +384,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                         {q.matchingPairs?.map((pair, idx) => (
                             <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
                                 <td className="px-4 py-3 text-center font-mono text-slate-500 sticky left-0 bg-slate-900 shadow-[1px_0_0_rgba(255,255,255,0.1)] z-10">{idx + 1}</td>
-                                <td className="px-4 py-3 font-medium text-slate-200 min-w-[200px]">{pair.left}</td>
+                                <td className="px-4 py-3 font-medium text-slate-200 min-w-[200px] text-lg">{pair.left}</td>
                                 <td className="px-4 py-3 text-center bg-emerald-900/10">
                                     <label className="flex items-center justify-center w-full h-full cursor-pointer min-h-[40px]">
                                         <input 
@@ -730,7 +732,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                           <img src={currentQuestion.image} alt="Lampiran Soal" className="max-w-full h-auto max-h-[400px] object-contain rounded-lg shadow-lg border border-slate-600 mt-8 md:mt-0" />
                        </div>
                     )}
-                    <p className="text-2xl md:text-3xl text-white leading-relaxed mb-10 font-bold drop-shadow-sm whitespace-pre-wrap">{currentQuestion.text}</p>
+                    <p className="text-lg text-white leading-relaxed mb-8 font-medium whitespace-pre-wrap">{currentQuestion.text}</p>
                     <div className="mb-6 flex-1">
                       {currentQuestion.type === QuestionType.SINGLE && renderSingleChoice(currentQuestion)}
                       {currentQuestion.type === QuestionType.COMPLEX && renderComplexChoice(currentQuestion)}
@@ -805,10 +807,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
              <button onClick={() => setMenuTab('CAREER')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all mt-0 md:mt-4 ${menuTab === 'CAREER' ? 'text-yellow-500 bg-white/10' : 'text-slate-500 hover:text-white'}`}>
                 <Trophy size={24} /><span className="text-[10px] uppercase font-bold md:hidden">Career</span>
              </button>
-             <div className="flex-1 hidden md:block"></div>
-             <button onClick={onLogout} className="p-3 rounded-xl flex flex-col items-center gap-1 text-red-500 hover:bg-red-500/10 transition-all mb-0 md:mb-6">
+             <button onClick={onLogout} className="p-3 rounded-xl flex flex-col items-center gap-1 text-red-500 hover:bg-red-500/10 transition-all mb-0 md:mb-6 mt-0 md:mt-4">
                 <LogOut size={24} /><span className="text-[10px] uppercase font-bold md:hidden">Exit</span>
              </button>
+             <div className="flex-1 hidden md:block"></div>
         </div>
 
         <div className="flex-1 flex flex-col h-full overflow-hidden pb-16 md:pb-0 relative">
@@ -891,23 +893,28 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                         <div className="flex flex-col lg:flex-row gap-6 h-full">
                             <div className={`${selectedHistory ? 'hidden lg:block lg:w-1/3' : 'w-full'} transition-all`}>
                                 <div className="space-y-3">
-                                    {myHistory.map((item, idx) => (
-                                        <div key={idx} onClick={() => setSelectedHistory(item)} className={`p-4 border rounded-xl cursor-pointer transition-all relative overflow-hidden ${selectedHistory === item ? 'bg-yellow-500/10 border-yellow-500' : 'bg-slate-900 border-slate-700 hover:bg-slate-800'}`}>
-                                            <div className="flex justify-between items-center relative z-10">
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs border ${item.score >= 75 ? 'bg-yellow-500 text-black border-yellow-400' : 'bg-slate-700 text-white border-slate-600'}`}>{Math.round(item.score)}</div>
-                                                    <div>
-                                                        <h4 className={`font-bold text-sm uppercase ${selectedHistory === item ? 'text-yellow-400' : 'text-slate-200'}`}>{item.examTitle}</h4>
-                                                        <div className="flex gap-2 mt-1">
-                                                            <span className="text-[10px] px-1 bg-purple-900/50 text-purple-300 rounded border border-purple-500/30">L: {Math.round(item.literasiScore)}</span>
-                                                            <span className="text-[10px] px-1 bg-orange-900/50 text-orange-300 rounded border border-orange-500/30">N: {Math.round(item.numerasiScore)}</span>
+                                    {myHistory.map((item, idx) => {
+                                        const relatedExam = exams.find(e => e.id === item.examId);
+                                        const examType = relatedExam?.questions[0]?.category || 'UMUM';
+                                        
+                                        return (
+                                            <div key={idx} onClick={() => setSelectedHistory(item)} className={`p-5 border rounded-xl cursor-pointer transition-all relative overflow-hidden group ${selectedHistory === item ? 'bg-yellow-500/10 border-yellow-500' : 'bg-slate-900 border-slate-700 hover:bg-slate-800'}`}>
+                                                <div className="flex justify-between items-center relative z-10">
+                                                    <div className="flex-1">
+                                                        <h4 className={`font-black text-lg uppercase tracking-wide mb-1 ${selectedHistory === item ? 'text-yellow-400' : 'text-white'}`}>{item.examTitle}</h4>
+                                                        <div className="flex items-center gap-3 text-xs text-slate-400">
+                                                            <span className="bg-slate-800 border border-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase text-blue-300">{examType}</span>
+                                                            <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(item.timestamp).toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}</span>
                                                         </div>
                                                     </div>
+                                                    <div className="text-right pl-4">
+                                                        <div className={`text-2xl font-black ${item.score >= 75 ? 'text-green-400' : 'text-red-400'}`}>{Math.round(item.score)}</div>
+                                                        <div className="text-[10px] uppercase text-slate-500 font-bold">Score</div>
+                                                    </div>
                                                 </div>
-                                                <ChevronRight size={18} className="text-slate-500"/>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                     {myHistory.length === 0 && <div className="text-center p-8 text-slate-500 italic border border-dashed border-slate-700 rounded-xl">No battle history found.</div>}
                                 </div>
                             </div>
@@ -926,55 +933,62 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                              <p className="text-xs text-slate-400 uppercase tracking-widest mt-2">Total Score</p>
                                          </div>
                                          
-                                         {/* --- NEW: VISUAL CORRECT / INCORRECT GRID --- */}
+                                         {/* --- DETAILED QUESTION LIST --- */}
                                          <div className="mb-8">
-                                            <p className="text-xs text-slate-400 font-bold uppercase mb-2">Detail Jawaban (Benar/Salah)</p>
-                                            <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                                                <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
-                                                    {(() => {
-                                                       const relatedExam = exams.find(e => e.id === selectedHistory.examId);
-                                                       if (!relatedExam) return <p className="text-xs text-red-500">Data ujian tidak ditemukan.</p>;
+                                            <p className="text-xs text-slate-400 font-bold uppercase mb-4 border-b border-slate-800 pb-2">Detail Jawaban</p>
+                                            <div className="space-y-2">
+                                                {(() => {
+                                                   const relatedExam = exams.find(e => e.id === selectedHistory.examId);
+                                                   if (!relatedExam) return <p className="text-xs text-red-500">Data ujian tidak ditemukan.</p>;
+                                                   
+                                                   return relatedExam.questions.map((q, idx) => {
+                                                       const ans = selectedHistory.answers[q.id];
+                                                       let isCorrect = false;
+                                                       if (q.type === QuestionType.SINGLE) {
+                                                           if (ans === q.correctAnswerIndex) isCorrect = true;
+                                                       } else if (q.type === QuestionType.COMPLEX) {
+                                                           const userSet = new Set(ans as number[]);
+                                                           const correctSet = new Set(q.correctAnswerIndices);
+                                                           if (userSet.size === correctSet.size && [...userSet].every(x => correctSet.has(x))) isCorrect = true;
+                                                       } else if (q.type === QuestionType.MATCHING) {
+                                                            // Simplified check for demo
+                                                            isCorrect = true; // Assume logic handled in score calc, here we just show status
+                                                            // Re-calculate strictly if needed, but for display we assume score reflects correctness
+                                                            // Since we don't store per-question correctness in ExamResult, we re-eval
+                                                            const userPairs = ans as Record<string, string>;
+                                                            if (userPairs && q.matchingPairs) {
+                                                                const allCorrect = q.matchingPairs.every(pair => userPairs[pair.left] === pair.right);
+                                                                if (!allCorrect) isCorrect = false;
+                                                            } else {
+                                                                isCorrect = false;
+                                                            }
+                                                       }
                                                        
-                                                       // We iterate through ORIGINAL questions. 
-                                                       // Note: If 'selectedHistory' stores shuffled indices, we assume the student ID matches and the key logic is consistent.
-                                                       // For simplicity in this demo, we check simple correctness from the stored answers.
-                                                       return relatedExam.questions.map((q, idx) => {
-                                                           const ans = selectedHistory.answers[q.id];
-                                                           let isCorrect = false;
-                                                           if (q.type === QuestionType.SINGLE) {
-                                                               if (ans === q.correctAnswerIndex) isCorrect = true;
-                                                           } else if (q.type === QuestionType.COMPLEX) {
-                                                               const userSet = new Set(ans as number[]);
-                                                               const correctSet = new Set(q.correctAnswerIndices);
-                                                               if (userSet.size === correctSet.size && [...userSet].every(x => correctSet.has(x))) isCorrect = true;
-                                                           }
-                                                           
-                                                           return (
-                                                               <div key={q.id} className={`aspect-square flex items-center justify-center text-xs font-black rounded border ${isCorrect ? 'bg-green-600 border-green-500 text-white' : 'bg-red-900/50 border-red-500 text-red-400'}`}>
+                                                       return (
+                                                           <div key={q.id} className="flex items-start gap-3 p-3 rounded bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition-colors">
+                                                               <div className={`flex-none w-6 h-6 flex items-center justify-center rounded font-bold text-xs ${isCorrect ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>
                                                                    {idx + 1}
                                                                </div>
-                                                           );
-                                                       });
-                                                    })()}
-                                                </div>
-                                                <div className="flex gap-4 mt-2 justify-center text-[10px] uppercase font-bold text-slate-500">
-                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-green-600 rounded"></div> Benar</span>
-                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-900/50 rounded border border-red-500"></div> Salah</span>
-                                                </div>
+                                                               <div className="flex-1 min-w-0">
+                                                                   <p className="text-sm text-slate-300 line-clamp-2 leading-relaxed">{q.text}</p>
+                                                               </div>
+                                                               <div className="flex-none">
+                                                                   {isCorrect ? (
+                                                                       <span className="text-[10px] font-bold uppercase text-green-400 bg-green-900/30 px-2 py-1 rounded border border-green-500/30">Benar</span>
+                                                                   ) : (
+                                                                       <span className="text-[10px] font-bold uppercase text-red-400 bg-red-900/30 px-2 py-1 rounded border border-red-500/30">Salah</span>
+                                                                   )}
+                                                               </div>
+                                                           </div>
+                                                       );
+                                                   });
+                                                })()}
                                             </div>
                                          </div>
 
-                                         <div className="grid grid-cols-2 gap-4 mb-8">
-                                             <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 text-center">
-                                                 <p className="text-xs text-purple-400 uppercase font-bold mb-1">Literasi</p>
-                                                 <p className="text-2xl font-black text-white">{Math.round(selectedHistory.literasiScore)}%</p>
-                                             </div>
-                                             <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 text-center">
-                                                 <p className="text-xs text-orange-400 uppercase font-bold mb-1">Numerasi</p>
-                                                 <p className="text-2xl font-black text-white">{Math.round(selectedHistory.numerasiScore)}%</p>
-                                             </div>
+                                         <div className="text-center text-xs text-slate-500 border-t border-slate-800 pt-4">
+                                             Detail jawaban disimpan di server untuk analisis lebih lanjut oleh guru.
                                          </div>
-                                         <div className="text-center text-xs text-slate-500">Detail jawaban disimpan di server untuk dianalisis oleh admin.</div>
                                      </div>
                                 </div>
                             )}

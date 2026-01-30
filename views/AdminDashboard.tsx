@@ -32,6 +32,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentFileRef = useRef<HTMLInputElement>(null);
+  const questionFileRef = useRef<HTMLInputElement>(null); // New ref for Question Import
   const imageUploadRef = useRef<HTMLInputElement>(null); // For Question Image
   
   // --- Student Management State ---
@@ -178,6 +179,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           };
           reader.readAsDataURL(file);
       }
+  };
+
+  const handleDownloadTemplateQuestion = () => {
+    const data = [
+      ["Pertanyaan", "Opsi A", "Opsi B", "Opsi C", "Opsi D", "Kunci Jawaban (A/B/C/D)"],
+      ["Siapa presiden pertama RI?", "Soekarno", "Hatta", "Syahrir", "Sudirman", "A"],
+      ["Siapa proklamator?", "Hatta", "Soekarno", "Yamin", "Supomo", "B"]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template Soal");
+    XLSX.writeFile(wb, 'Template_Soal_Guru.xlsx');
+  };
+
+  const handleImportQuestions = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const data = event.target?.result;
+      const workbook = XLSX.read(data, { type: 'binary' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      // Skip header row
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }).slice(1) as any[][];
+
+      const packet = packets.find(p => p.id === selectedPacketId);
+      const packetCategory = packet ? packet.category : QuestionCategory.LITERASI;
+
+      const imported: Question[] = rows
+        .filter(row => row[0]) // Ensure question text exists
+        .map((row, idx) => {
+          const text = row[0];
+          const opts = [row[1], row[2], row[3], row[4]];
+          const keyRaw = row[5];
+          
+          let correctIndex = 0;
+          if (keyRaw && typeof keyRaw === 'string') {
+             const k = keyRaw.trim().toUpperCase();
+             if (k === 'A') correctIndex = 0;
+             else if (k === 'B') correctIndex = 1;
+             else if (k === 'C') correctIndex = 2;
+             else if (k === 'D') correctIndex = 3;
+          }
+
+          return {
+            id: `imp-q-${Date.now()}-${idx}`,
+            packetId: selectedPacketId || undefined,
+            text: text,
+            options: opts,
+            correctAnswerIndex: correctIndex,
+            type: QuestionType.SINGLE,
+            category: packetCategory
+          };
+        });
+      setQuestions([...questions, ...imported]);
+      alert(`Berhasil mengimpor ${imported.length} soal.`);
+      triggerSync();
+    };
+    reader.readAsBinaryString(file);
+    if(questionFileRef.current) questionFileRef.current.value = '';
   };
 
   // --- HANDLERS ---
@@ -361,6 +425,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="max-w-2xl bg-slate-900/80 border border-white/10 p-8 rounded-lg">
                   <div className="space-y-4">
                       <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Nama Sekolah</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.schoolName} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, schoolName: e.target.value})} /></div>
+                      <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Judul Login (CBT)</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.cbtTitle || ''} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, cbtTitle: e.target.value})} /></div>
                       <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Password Admin</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.adminPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, adminPassword: e.target.value})} /></div>
                       <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Password Guru Literasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.teacherLiterasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherLiterasiPassword: e.target.value})} /></div>
                       <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Password Guru Numerasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.teacherNumerasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherNumerasiPassword: e.target.value})} /></div>
@@ -513,7 +578,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       );
   }
 
-  // --- MONITORING TAB (Fixed) ---
+  // --- MONITORING TAB (Updated) ---
   if (activeTab === 'monitor') {
       const selectedMonitorExam = exams.find(e => e.id === selectedExamForMonitor);
       // Determine student list based on class target and filter
@@ -545,9 +610,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           return 0; // Keep original order for unfinished
       });
 
+      // Cheating Analysis
+      const suspiciousCount = displayData.filter(i => i.result && (i.result.violationCount! > 0 || i.result.isDisqualified)).length;
+
       return (
           <div className="p-8 h-full flex flex-col">
               <h2 className="text-2xl font-black text-white uppercase mb-6"><Activity className="inline mr-2 text-yellow-500"/> Live Monitoring</h2>
+              
+              {/* Alert Notification for Cheating */}
+              {suspiciousCount > 0 && (
+                  <div className="bg-red-900/50 border border-red-500 p-4 mb-6 rounded flex items-center gap-4 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]">
+                      <AlertOctagon size={32} className="text-red-500" />
+                      <div>
+                          <h3 className="font-bold text-white uppercase tracking-wider text-sm">Terdeteksi Kecurangan!</h3>
+                          <p className="text-sm text-red-200">Ada <span className="font-black text-white">{suspiciousCount}</span> siswa yang terdeteksi melakukan pelanggaran atau didiskualifikasi.</p>
+                      </div>
+                  </div>
+              )}
+
               <div className="mb-6 flex flex-col md:flex-row gap-4">
                   <div className="flex-1">
                       <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Pilih Ujian Aktif</label>
@@ -577,7 +657,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="p-4 border-b border-white/10 flex gap-6 text-sm">
                           <div className="text-slate-400">Total Peserta: <span className="text-white font-bold">{targetedStudents.length}</span></div>
                           <div className="text-slate-400">Sudah Mengerjakan: <span className="text-green-400 font-bold">{targetedStudents.filter(s => currentResults.some(r => r.studentId === s.id)).length}</span></div>
-                          <div className="text-slate-400">Belum: <span className="text-red-400 font-bold">{targetedStudents.filter(s => !currentResults.some(r => r.studentId === s.id)).length}</span></div>
+                          <div className="text-slate-400">Belum: <span className="text-slate-500 font-bold">{targetedStudents.filter(s => !currentResults.some(r => r.studentId === s.id)).length}</span></div>
                       </div>
                       <table className="w-full text-left text-sm text-slate-300">
                           <thead className="bg-black/50 text-slate-500 uppercase text-xs">
@@ -599,7 +679,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                           <td className="p-3 font-medium text-white">{item.name}</td>
                                           <td className="p-3">{item.class}</td>
                                           <td className="p-3">
-                                              {res ? <span className="px-2 py-1 bg-green-900 text-green-400 text-xs font-bold rounded">SELESAI</span> : <span className="px-2 py-1 bg-slate-800 text-slate-500 text-xs font-bold rounded">BELUM</span>}
+                                              {res?.isDisqualified ? (
+                                                  <span className="bg-red-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><ShieldAlert size={10}/> DISKUALIFIKASI</span>
+                                              ) : res?.violationCount && res.violationCount > 0 ? (
+                                                  <span className="bg-orange-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><AlertTriangle size={10}/> PELANGGARAN: {res.violationCount}</span>
+                                              ) : res ? (
+                                                   <span className="bg-green-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><Check size={10}/> AMAN</span>
+                                              ) : (
+                                                   <span className="bg-slate-700 text-slate-400 px-2 py-1 text-[10px] font-bold uppercase rounded">BELUM</span>
+                                              )}
                                           </td>
                                           <td className="p-3 font-mono font-bold text-yellow-500">{res ? res.score.toFixed(1) : '-'}</td>
                                           <td className="p-3 text-xs text-slate-400">{res ? new Date(res.timestamp).toLocaleTimeString() : '-'}</td>
@@ -618,7 +706,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   if (activeTab === 'questions') {
     return (
       <div className="p-8 flex flex-col h-full overflow-hidden">
-         <div className="flex justify-between mb-4 flex-none"><h2 className="text-2xl font-black text-white uppercase"><BookOpen className="inline mr-2 text-yellow-500"/> Bank Soal</h2><div className="flex bg-slate-800 rounded"><button onClick={() => setBankSubTab('config')} className={`px-4 py-2 text-xs font-bold ${bankSubTab==='config'?'bg-blue-600 text-white':'text-slate-400'}`}>Paket</button><button onClick={() => setBankSubTab('input')} className={`px-4 py-2 text-xs font-bold ${bankSubTab==='input'?'bg-blue-600 text-white':'text-slate-400'}`}>Input</button></div></div>
+         <div className="flex justify-between items-center mb-6 flex-none border-b border-white/10 pb-4">
+             <div className="flex items-center gap-4">
+                 <h2 className="text-2xl font-black text-white uppercase"><BookOpen className="inline mr-2 text-yellow-500"/> Bank Soal</h2>
+                 <div className="flex bg-slate-800 rounded border border-slate-700">
+                     <button onClick={() => setBankSubTab('config')} className={`px-4 py-2 text-xs font-bold uppercase transition-all ${bankSubTab==='config'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'}`}>Paket</button>
+                     <button onClick={() => setBankSubTab('input')} className={`px-4 py-2 text-xs font-bold uppercase transition-all ${bankSubTab==='input'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'}`}>Input Soal</button>
+                 </div>
+             </div>
+             
+             {/* Import/Template Actions */}
+             <div className="flex gap-2">
+                 <input type="file" ref={questionFileRef} className="hidden" accept=".xlsx" onChange={handleImportQuestions} />
+                 <button onClick={handleDownloadTemplateQuestion} className="bg-slate-800 text-slate-300 border border-slate-600 px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2 hover:bg-slate-700 transition-colors"><Download size={14}/> Template</button>
+                 <button onClick={() => questionFileRef.current?.click()} className="bg-green-700 text-white px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2 hover:bg-green-600 transition-colors shadow-lg"><Upload size={14}/> Import Excel</button>
+             </div>
+         </div>
+         
          {bankSubTab === 'config' && (
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden min-h-0">
                  <div className="bg-slate-900 p-6 border border-white/10 h-fit">
@@ -802,7 +906,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <div key={e.id} className={`bg-slate-900 border p-4 flex justify-between ${e.isActive?'border-green-500':'border-slate-700'}`}>
                                   <div>
                                       <h4 className="font-bold text-white text-lg">{e.title}</h4>
-                                      <p className="text-xs text-yellow-500 mb-1">{pkt?.name} <span className="text-slate-500">|</span> {pkt?.category}</p>
+                                      <div className="flex items-center gap-2 mb-1 mt-1">
+                                          <span className="bg-yellow-900 text-yellow-500 border border-yellow-700 px-2 py-0.5 text-[10px] uppercase font-bold rounded">{pkt?.name || 'Paket Tidak Dikenal'}</span>
+                                          <span className="bg-purple-900 text-purple-400 border border-purple-700 px-2 py-0.5 text-[10px] uppercase font-bold rounded">{pkt?.category || '-'}</span>
+                                      </div>
                                       <p className="text-xs text-slate-400 mb-1">{e.classTarget.join(', ')} <span className="text-slate-600 mx-2">|</span> {e.durationMinutes} Menit</p>
                                       <p className="text-[10px] text-slate-500 font-mono">{formatDateRange(e.scheduledStart, e.scheduledEnd)}</p>
                                   </div>
