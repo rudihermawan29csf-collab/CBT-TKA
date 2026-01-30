@@ -368,11 +368,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
              <div className="flex items-center gap-2 mb-2 bg-slate-800/80 p-2 rounded border-l-4 border-orange-500 w-fit">
                  <span className="text-sm font-bold text-orange-400 uppercase tracking-wider">Benar / Salah</span>
              </div>
-             <div className="overflow-hidden rounded-lg border border-slate-700">
-                 <table className="w-full text-left text-sm text-slate-300">
+             <div className="overflow-x-auto rounded-lg border border-slate-700 pb-2 custom-scrollbar">
+                 <table className="w-full text-left text-sm text-slate-300 min-w-[600px]">
                     <thead className="bg-slate-800 text-xs uppercase font-bold text-slate-400">
                         <tr>
-                            <th className="px-4 py-3 border-b border-slate-700 w-12 text-center">No</th>
+                            <th className="px-4 py-3 border-b border-slate-700 w-12 text-center sticky left-0 bg-slate-800 shadow-[1px_0_0_rgba(255,255,255,0.1)] z-10">No</th>
                             <th className="px-4 py-3 border-b border-slate-700">Pernyataan</th>
                             <th className="px-4 py-3 border-b border-slate-700 w-24 text-center bg-emerald-900/20 text-emerald-400">{col1Label}</th>
                             <th className="px-4 py-3 border-b border-slate-700 w-24 text-center bg-red-900/20 text-red-400">{col2Label}</th>
@@ -381,10 +381,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                     <tbody className="divide-y divide-slate-700 bg-slate-900/30">
                         {q.matchingPairs?.map((pair, idx) => (
                             <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
-                                <td className="px-4 py-3 text-center font-mono text-slate-500">{idx + 1}</td>
-                                <td className="px-4 py-3 font-medium text-slate-200">{pair.left}</td>
+                                <td className="px-4 py-3 text-center font-mono text-slate-500 sticky left-0 bg-slate-900 shadow-[1px_0_0_rgba(255,255,255,0.1)] z-10">{idx + 1}</td>
+                                <td className="px-4 py-3 font-medium text-slate-200 min-w-[200px]">{pair.left}</td>
                                 <td className="px-4 py-3 text-center bg-emerald-900/10">
-                                    <label className="flex items-center justify-center w-full h-full cursor-pointer">
+                                    <label className="flex items-center justify-center w-full h-full cursor-pointer min-h-[40px]">
                                         <input 
                                             type="radio" 
                                             name={`q-${q.id}-row-${idx}`}
@@ -395,7 +395,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                     </label>
                                 </td>
                                 <td className="px-4 py-3 text-center bg-red-900/10">
-                                    <label className="flex items-center justify-center w-full h-full cursor-pointer">
+                                    <label className="flex items-center justify-center w-full h-full cursor-pointer min-h-[40px]">
                                         <input 
                                             type="radio" 
                                             name={`q-${q.id}-row-${idx}`}
