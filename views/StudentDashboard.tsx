@@ -480,9 +480,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
   if (introStep === 2) { /* Rules Screen Code */
       return (
-          <div className="h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden text-white">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-              <div className="max-w-3xl w-full bg-slate-900/90 border border-white/10 p-8 md:p-12 relative shadow-2xl backdrop-blur-sm">
+          <div className="min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-y-auto text-white">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 fixed"></div>
+              <div className="max-w-3xl w-full bg-slate-900/90 border border-white/10 p-8 md:p-12 relative shadow-2xl backdrop-blur-sm my-auto">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
                   <h2 className="text-3xl font-black text-white mb-8 text-center uppercase tracking-widest flex items-center justify-center gap-3"><AlertCircle className="text-yellow-500" /> Aturan Pertempuran</h2>
                   <div className="space-y-4 mb-8 text-slate-300 font-medium">
@@ -549,7 +549,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
     const isDoubt = doubts.has(currentQuestion.id);
 
     return (
-      <div className="h-screen flex flex-col bg-slate-950 text-white font-sans overflow-hidden relative">
+      <div className="h-[100dvh] flex flex-col bg-slate-950 text-white font-sans overflow-hidden relative supports-[height:100dvh]:h-[100dvh]">
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] pointer-events-none"></div>
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/90 to-black/90 pointer-events-none"></div>
 
@@ -713,16 +713,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                 </div>
               </div>
 
-              {/* FIXED ACTION BUTTONS (Sticky Bottom) */}
-              <div className="p-4 bg-black/80 backdrop-blur border-t border-white/10 z-20">
-                  <div className="max-w-5xl mx-auto grid grid-cols-3 gap-4 md:gap-8">
-                    <button onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))} disabled={currentQuestionIndex === 0} className="group flex items-center justify-center space-x-2 px-4 py-3 bg-slate-800 border-b-4 border-slate-950 text-slate-300 hover:bg-slate-700 font-bold uppercase rounded text-sm md:text-base disabled:opacity-50">
+              {/* FIXED ACTION BUTTONS (Sticky Bottom) - UPDATED FOR MOBILE VISIBILITY */}
+              <div className="p-2 md:p-4 bg-black/90 backdrop-blur border-t border-white/10 z-30 pb-6 md:pb-4">
+                  <div className="max-w-5xl mx-auto flex gap-2 md:gap-8 overflow-x-auto pb-2 md:pb-0">
+                    <button onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))} disabled={currentQuestionIndex === 0} className="flex-1 min-w-[100px] group flex items-center justify-center space-x-2 px-4 py-3 bg-slate-800 border-b-4 border-slate-950 text-slate-300 hover:bg-slate-700 font-bold uppercase rounded text-sm md:text-base disabled:opacity-50">
                       <ChevronLeft size={20} /> <span>Prev</span>
                     </button>
-                    <button onClick={() => toggleDoubt(currentQuestion.id)} className={`flex items-center justify-center space-x-2 px-4 py-3 border-b-4 font-bold uppercase transition-all rounded text-sm md:text-base ${isDoubt ? 'bg-orange-600 text-white border-orange-800' : 'bg-slate-800 text-yellow-500 border-slate-950'}`}>
+                    <button onClick={() => toggleDoubt(currentQuestion.id)} className={`flex-1 min-w-[100px] flex items-center justify-center space-x-2 px-4 py-3 border-b-4 font-bold uppercase transition-all rounded text-sm md:text-base ${isDoubt ? 'bg-orange-600 text-white border-orange-800' : 'bg-slate-800 text-yellow-500 border-slate-950'}`}>
                       <Flag size={20} fill={isDoubt ? "currentColor" : "none"} /> <span>{isDoubt ? 'Ragu' : 'Mark'}</span>
                     </button>
-                    <button onClick={() => handleSaveAndNext(currentQuestion.id)} className="group flex items-center justify-center space-x-2 px-4 py-3 bg-yellow-600 border-b-4 border-yellow-800 text-black hover:bg-yellow-500 font-black uppercase rounded text-sm md:text-base">
+                    <button onClick={() => handleSaveAndNext(currentQuestion.id)} className="flex-1 min-w-[100px] group flex items-center justify-center space-x-2 px-4 py-3 bg-yellow-600 border-b-4 border-yellow-800 text-black hover:bg-yellow-500 font-black uppercase rounded text-sm md:text-base">
                       <span>Next</span> <ChevronRight size={20} />
                     </button>
                   </div>
