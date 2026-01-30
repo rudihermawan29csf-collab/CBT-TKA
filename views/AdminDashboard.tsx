@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Student, Teacher, Question, QuestionType, QuestionCategory, QuestionPacket, Exam, Role, SchoolSettings, ExamResult } from '../types';
-import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone } from 'lucide-react';
+import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX } from 'lucide-react';
 import { CLASS_LIST } from '../constants';
 import * as XLSX from 'xlsx';
 
@@ -32,6 +32,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentFileRef = useRef<HTMLInputElement>(null);
+  const imageUploadRef = useRef<HTMLInputElement>(null); // For Question Image
   
   // --- Student Management State ---
   const [selectedClassFilter, setSelectedClassFilter] = useState(''); 
@@ -52,11 +53,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeSlot, setActiveSlot] = useState<number | null>(null); 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [manualType, setManualType] = useState<QuestionType>(QuestionType.SINGLE);
-  const [mediaType, setMediaType] = useState<'text' | 'image'>('text');
-
+  
+  // Stimulus State
+  const [stimulusType, setStimulusType] = useState<'text' | 'image'>('text');
   const [newStimulus, setNewStimulus] = useState(''); 
   const [newQuestionText, setNewQuestionText] = useState('');
-  const [newQuestionImage, setNewQuestionImage] = useState('');
+  const [newQuestionImage, setNewQuestionImage] = useState(''); // Stores Base64
+  
+  // Options State
   const [newOptions, setNewOptions] = useState<string[]>(['', '', '', '']);
   const [singleCorrectIndex, setSingleCorrectIndex] = useState(0);
   const [complexCorrectIndices, setComplexCorrectIndices] = useState<number[]>([]);
@@ -72,10 +76,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- MONITORING STATE ---
   const [selectedExamForMonitor, setSelectedExamForMonitor] = useState<string>('');
+  const [monitoringClassFilter, setMonitoringClassFilter] = useState<string>('');
+  const [monitoringStatusFilter, setMonitoringStatusFilter] = useState<'all' | 'finished' | 'unfinished'>('all');
 
   // --- Analysis State ---
-  const [analysisSubTab, setAnalysisSubTab] = useState<'item' | 'recap'>('item');
+  const [analysisSubTab, setAnalysisSubTab] = useState<'item' | 'recap' | 'missing'>('item');
   const [selectedExamIdForAnalysis, setSelectedExamIdForAnalysis] = useState<string>('');
+  const [analysisClassFilter, setAnalysisClassFilter] = useState<string>('');
 
   // --- MEMOIZED FILTERS (ROLE BASED) ---
   const visiblePackets = useMemo(() => {
@@ -134,6 +141,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return `${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} s.d ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
   };
 
+  // Handle Image Upload to Base64
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              setNewQuestionImage(reader.result as string);
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
   // --- HANDLERS ---
   const handleCreateExam = () => {
     if (!newExamTitle || !newExamPacketId || !newExamStart || !newExamEnd || newExamClasses.length === 0) { alert("Lengkapi data ujian."); return; }
@@ -184,13 +203,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSaveQuestionSlot = () => {
       if (!selectedPacketId || activeSlot === null) return;
       if (!newQuestionText) { alert("Pertanyaan wajib diisi"); return; }
-      const qData: Partial<Question> = { packetId: selectedPacketId, number: activeSlot, stimulus: mediaType === 'text' ? newStimulus : '', text: newQuestionText, image: newQuestionImage, type: manualType, category: packets.find(p => p.id === selectedPacketId)?.category };
-      if (mediaType === 'image') qData.stimulus = ''; if (mediaType === 'text') qData.image = '';
-      if (manualType === QuestionType.SINGLE) { qData.options = newOptions; qData.correctAnswerIndex = singleCorrectIndex; }
-      else if (manualType === QuestionType.COMPLEX) { qData.options = newOptions; qData.correctAnswerIndices = complexCorrectIndices; }
-      else if (manualType === QuestionType.MATCHING) { qData.options = [newOptions[0]||'Benar', newOptions[1]||'Salah']; qData.matchingPairs = matchingPairs; }
+      
+      const qData: Partial<Question> = { 
+          packetId: selectedPacketId, 
+          number: activeSlot, 
+          text: newQuestionText, 
+          type: manualType, 
+          category: packets.find(p => p.id === selectedPacketId)?.category 
+      };
+
+      // Handle Stimulus
+      if (stimulusType === 'text') {
+          qData.stimulus = newStimulus;
+          qData.image = '';
+      } else {
+          qData.stimulus = '';
+          qData.image = newQuestionImage;
+      }
+
+      // Handle Answers based on Type
+      if (manualType === QuestionType.SINGLE) { 
+          qData.options = newOptions; 
+          qData.correctAnswerIndex = singleCorrectIndex; 
+      }
+      else if (manualType === QuestionType.COMPLEX) { 
+          qData.options = newOptions; 
+          qData.correctAnswerIndices = complexCorrectIndices; 
+      }
+      else if (manualType === QuestionType.MATCHING) { 
+          // For Matching, options are usually labels for columns e.g. "Benar", "Salah" if simple, or we rely on matchingPairs logic
+          // Here we assume simple matchingPairs logic.
+          qData.options = ['Benar', 'Salah']; 
+          qData.matchingPairs = matchingPairs.filter(p => p.left && p.right); 
+      }
+
       if (editingQuestionId) setQuestions(prev => prev.map(q => q.id === editingQuestionId ? { ...q, ...qData } as Question : q));
       else setQuestions(prev => [...prev, { ...qData, id: `q-${Date.now()}` } as Question]);
+      
       setPackets(prev => prev.map(p => p.id === selectedPacketId ? { ...p, questionTypes: { ...p.questionTypes, [activeSlot]: manualType } } : p));
       alert(`Soal No. ${activeSlot} tersimpan`); triggerSync();
   };
@@ -201,16 +250,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const pkt = packets.find(p => p.id === selectedPacketId);
       const type = pkt?.questionTypes[num] || QuestionType.SINGLE;
       setManualType(type);
+      
       if (existingQ) {
-          setEditingQuestionId(existingQ.id); setNewStimulus(existingQ.stimulus || ''); setNewQuestionText(existingQ.text); setNewQuestionImage(existingQ.image || '');
-          setMediaType(existingQ.image ? 'image' : 'text');
-          if (existingQ.type === QuestionType.SINGLE) { setNewOptions(existingQ.options || ['', '', '', '']); setSingleCorrectIndex(existingQ.correctAnswerIndex || 0); }
-          else if (existingQ.type === QuestionType.COMPLEX) { setNewOptions(existingQ.options || ['', '', '', '']); setComplexCorrectIndices(existingQ.correctAnswerIndices || []); }
-          else if (existingQ.type === QuestionType.MATCHING) { setNewOptions(existingQ.options || ['Benar', 'Salah']); setMatchingPairs(existingQ.matchingPairs || [{left:'', right:''}]); }
+          setEditingQuestionId(existingQ.id); 
+          setNewQuestionText(existingQ.text);
+          
+          if (existingQ.image) {
+              setStimulusType('image');
+              setNewQuestionImage(existingQ.image);
+              setNewStimulus('');
+          } else {
+              setStimulusType('text');
+              setNewStimulus(existingQ.stimulus || '');
+              setNewQuestionImage('');
+          }
+
+          if (existingQ.type === QuestionType.SINGLE) { 
+              setNewOptions(existingQ.options || ['', '', '', '']); 
+              setSingleCorrectIndex(existingQ.correctAnswerIndex || 0); 
+          }
+          else if (existingQ.type === QuestionType.COMPLEX) { 
+              setNewOptions(existingQ.options || ['', '', '', '']); 
+              setComplexCorrectIndices(existingQ.correctAnswerIndices || []); 
+          }
+          else if (existingQ.type === QuestionType.MATCHING) { 
+              setMatchingPairs(existingQ.matchingPairs || [{left:'', right:''}]); 
+          }
       } else {
-          setEditingQuestionId(null); setNewStimulus(''); setNewQuestionText(''); setNewQuestionImage(''); setMediaType('text');
-          if (type === QuestionType.MATCHING) { setNewOptions(['Benar', 'Salah']); setMatchingPairs([{left:'', right:''}]); }
-          else { setNewOptions(['', '', '', '']); setSingleCorrectIndex(0); setComplexCorrectIndices([]); }
+          setEditingQuestionId(null); 
+          setStimulusType('text'); setNewStimulus(''); setNewQuestionImage(''); setNewQuestionText('');
+          
+          if (type === QuestionType.MATCHING) { 
+              setMatchingPairs([{left:'', right:''}]); 
+          } else { 
+              setNewOptions(['', '', '', '']); 
+              setSingleCorrectIndex(0); 
+              setComplexCorrectIndices([]); 
+          }
       }
   };
 
@@ -262,35 +338,105 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   if (activeTab === 'analysis') {
+      const targetExam = exams.find(e => e.id === selectedExamIdForAnalysis);
+      const targetStudents = targetExam ? students.filter(s => targetExam.classTarget.includes(s.class)) : [];
+      const filteredTargetStudents = analysisClassFilter ? targetStudents.filter(s => s.class === analysisClassFilter) : targetStudents;
+      
+      const finishedResults = selectedExamIdForAnalysis ? examResults.filter(r => r.examId === selectedExamIdForAnalysis) : [];
+      const finishedStudentIds = new Set(finishedResults.map(r => r.studentId));
+      
+      const missingStudents = filteredTargetStudents.filter(s => !finishedStudentIds.has(s.id));
+
       return (
-          <div className="p-8 h-full flex flex-col overflow-y-auto">
-               <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6"><BarChart2 className="text-yellow-500"/> Analisis Hasil Ujian</h2>
-               <div className="bg-slate-900/80 p-4 border border-white/10 mb-6 flex flex-wrap gap-4 items-end">
-                   <div className="flex-1"><label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Pilih Ujian</label><select className="w-full bg-black/50 border border-slate-700 p-2 text-white text-sm" value={selectedExamIdForAnalysis} onChange={e => setSelectedExamIdForAnalysis(e.target.value)}>{visibleExams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}</select></div>
-                   <div className="flex bg-slate-900 border border-slate-700 p-1 rounded">
+          <div className="p-8 h-full flex flex-col overflow-hidden">
+               <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6 flex-none"><BarChart2 className="text-yellow-500"/> Analisis Hasil Ujian</h2>
+               <div className="bg-slate-900/80 p-4 border border-white/10 mb-6 flex flex-col md:flex-row gap-4 items-end flex-none">
+                   <div className="flex-1 w-full"><label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Pilih Ujian</label><select className="w-full bg-black/50 border border-slate-700 p-2 text-white text-sm" value={selectedExamIdForAnalysis} onChange={e => setSelectedExamIdForAnalysis(e.target.value)}>{visibleExams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}</select></div>
+                   {(analysisSubTab === 'recap' || analysisSubTab === 'missing') && (
+                       <div className="w-full md:w-48">
+                           <label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Filter Kelas</label>
+                           <select className="w-full bg-black/50 border border-slate-700 p-2 text-white text-sm" value={analysisClassFilter} onChange={e => setAnalysisClassFilter(e.target.value)}>
+                               <option value="">Semua Kelas</option>
+                               {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+                           </select>
+                       </div>
+                   )}
+                   <div className="flex bg-slate-900 border border-slate-700 p-1 rounded shrink-0">
                        <button onClick={() => setAnalysisSubTab('item')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'item' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Butir Soal</button>
                        <button onClick={() => setAnalysisSubTab('recap')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'recap' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Rekap Nilai</button>
+                       <button onClick={() => setAnalysisSubTab('missing')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'missing' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Belum Ujian</button>
                    </div>
                </div>
+               
                {analysisSubTab === 'item' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
                        <div className="mb-4 flex justify-end"><button onClick={handleDownloadAnalysisExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button></div>
                        {selectedExamForAnalysis ? (
                            <div className="grid grid-cols-1 gap-4">{selectedExamForAnalysis.questions.map((q, idx) => { const stats = getItemAnalysis(q.id, q); return (<div key={q.id} className="bg-slate-900 border border-slate-800 p-4 rounded"><div className="flex justify-between items-start mb-2"><span className="font-bold text-yellow-500 text-sm">Soal No. {idx + 1} ({q.type})</span><span className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${stats.correctRate > 70 ? 'bg-green-900 text-green-400' : stats.correctRate > 30 ? 'bg-yellow-900 text-yellow-400' : 'bg-red-900 text-red-400'}`}>{stats.correctRate > 70 ? 'Mudah' : stats.correctRate > 30 ? 'Sedang' : 'Sukar'}</span></div><p className="text-slate-300 text-sm mb-3 bg-black/20 p-2 rounded">{q.text}</p><div className="flex items-center gap-4 text-xs mb-4"><div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-red-500 to-green-500" style={{ width: `${stats.correctRate}%` }}></div></div><span className="font-mono text-white">{stats.correctRate.toFixed(0)}% Benar ({stats.correctCount}/{stats.totalAttempts})</span></div></div>); })}</div>
                        ) : <p className="text-slate-500">Pilih ujian untuk melihat data.</p>}
                    </div>
                )}
+               
                {analysisSubTab === 'recap' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-                        <div className="mb-4 flex justify-end"><button onClick={handleDownloadRecapExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button></div>
-                        <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden"><table className="w-full text-left text-sm text-slate-300"><thead className="bg-black/50 text-slate-400 text-xs uppercase font-bold"><tr><th className="p-3">No</th><th className="p-3">Nama Siswa</th><th className="p-3">Kelas</th><th className="p-3 text-right">Nilai Akhir</th></tr></thead><tbody>{selectedExamIdForAnalysis ? examResults.filter(r => r.examId === selectedExamIdForAnalysis).map((r, i) => (<tr key={i} className="border-b border-slate-800 hover:bg-white/5"><td className="p-3 text-center w-12">{i+1}</td><td className="p-3 font-medium text-white">{r.studentName}</td><td className="p-3">{r.studentClass}</td><td className="p-3 text-right font-bold text-yellow-500">{r.score.toFixed(1)}</td></tr>)) : <tr><td colSpan={4} className="p-8 text-center text-slate-500">Pilih ujian untuk melihat rekap nilai.</td></tr>}</tbody></table></div>
+                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
+                        <div className="mb-4 flex justify-between items-center flex-none">
+                            <div className="text-sm text-slate-400">Total: <span className="text-white font-bold">{finishedResults.length}</span> Selesai</div>
+                            <button onClick={handleDownloadRecapExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button>
+                        </div>
+                        <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden flex-none">
+                            <table className="w-full text-left text-sm text-slate-300">
+                                <thead className="bg-black/50 text-slate-400 text-xs uppercase font-bold"><tr><th className="p-3">No</th><th className="p-3">Nama Siswa</th><th className="p-3">Kelas</th><th className="p-3 text-right">Nilai Akhir</th></tr></thead>
+                                <tbody>
+                                    {selectedExamIdForAnalysis ? 
+                                        finishedResults
+                                        .filter(r => !analysisClassFilter || r.studentClass === analysisClassFilter)
+                                        .map((r, i) => (
+                                            <tr key={i} className="border-b border-slate-800 hover:bg-white/5">
+                                                <td className="p-3 text-center w-12">{i+1}</td>
+                                                <td className="p-3 font-medium text-white">{r.studentName}</td>
+                                                <td className="p-3">{r.studentClass}</td>
+                                                <td className="p-3 text-right font-bold text-yellow-500">{r.score.toFixed(1)}</td>
+                                            </tr>
+                                        )) 
+                                        : <tr><td colSpan={4} className="p-8 text-center text-slate-500">Pilih ujian untuk melihat rekap nilai.</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                   </div>
+               )}
+
+               {analysisSubTab === 'missing' && (
+                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
+                       <div className="mb-4 flex justify-between items-center flex-none">
+                           <div className="text-sm text-slate-400">Total Belum Ujian: <span className="text-red-400 font-bold">{missingStudents.length}</span> Siswa</div>
+                       </div>
+                       <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden flex-none">
+                           <table className="w-full text-left text-sm text-slate-300">
+                               <thead className="bg-black/50 text-slate-400 text-xs uppercase font-bold"><tr><th className="p-3">No</th><th className="p-3">Nama Siswa</th><th className="p-3">Kelas</th><th className="p-3">NIS</th><th className="p-3">NISN</th></tr></thead>
+                               <tbody>
+                                   {selectedExamIdForAnalysis ? missingStudents.map((s, i) => (
+                                       <tr key={s.id} className="border-b border-slate-800 hover:bg-white/5">
+                                           <td className="p-3 text-center w-12">{i+1}</td>
+                                           <td className="p-3 font-medium text-white">{s.name}</td>
+                                           <td className="p-3">{s.class}</td>
+                                           <td className="p-3">{s.nis}</td>
+                                           <td className="p-3">{s.nisn}</td>
+                                       </tr>
+                                   )) : <tr><td colSpan={5} className="p-8 text-center text-slate-500">Pilih ujian untuk melihat data.</td></tr>}
+                                   {selectedExamIdForAnalysis && missingStudents.length === 0 && (
+                                       <tr><td colSpan={5} className="p-8 text-center text-green-500 font-bold">Semua siswa pada filter ini sudah mengerjakan ujian!</td></tr>
+                                   )}
+                               </tbody>
+                           </table>
+                       </div>
                    </div>
                )}
           </div>
       );
   }
 
-  // --- STUDENTS TAB (Restored) ---
+  // --- STUDENTS TAB ---
   if (activeTab === 'students') {
       const filteredStudents = selectedClassFilter ? students.filter(s => s.class === selectedClassFilter) : students;
       return (
@@ -333,30 +479,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       );
   }
 
-  // --- MONITORING TAB (New Implementation) ---
+  // --- MONITORING TAB (Fixed) ---
   if (activeTab === 'monitor') {
       const selectedMonitorExam = exams.find(e => e.id === selectedExamForMonitor);
-      // Determine student list based on class target
-      const targetedStudents = selectedMonitorExam ? students.filter(s => selectedMonitorExam.classTarget.includes(s.class)) : [];
+      // Determine student list based on class target and filter
+      const allTargetedStudents = selectedMonitorExam ? students.filter(s => selectedMonitorExam.classTarget.includes(s.class)) : [];
+      const targetedStudents = monitoringClassFilter ? allTargetedStudents.filter(s => s.class === monitoringClassFilter) : allTargetedStudents;
+      
       // Get Results
       const currentResults = examResults.filter(r => r.examId === selectedExamForMonitor);
+
+      // PREPARE DISPLAY DATA (Filter Status & Sort by Finished then Score)
+      const displayData = targetedStudents.map(s => {
+          const res = currentResults.find(r => r.studentId === s.id);
+          return { ...s, result: res };
+      }).filter(item => {
+          if (monitoringStatusFilter === 'finished') return !!item.result;
+          if (monitoringStatusFilter === 'unfinished') return !item.result;
+          return true;
+      }).sort((a, b) => {
+          // 1. Sort by Status (Finished first)
+          const aFinished = !!a.result;
+          const bFinished = !!b.result;
+          if (aFinished && !bFinished) return -1;
+          if (!aFinished && bFinished) return 1;
+          
+          // 2. Sort by Score (High to Low) if both finished
+          if (aFinished && bFinished) {
+              return (b.result?.score || 0) - (a.result?.score || 0);
+          }
+          return 0; // Keep original order for unfinished
+      });
 
       return (
           <div className="p-8 h-full flex flex-col">
               <h2 className="text-2xl font-black text-white uppercase mb-6"><Activity className="inline mr-2 text-yellow-500"/> Live Monitoring</h2>
-              <div className="mb-6">
-                  <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Pilih Ujian Aktif</label>
-                  <select className="w-full md:w-1/3 bg-slate-900 border border-slate-700 text-white p-2" value={selectedExamForMonitor} onChange={e => setSelectedExamForMonitor(e.target.value)}>
-                      {visibleExams.map(e => <option key={e.id} value={e.id}>{e.title} ({e.isActive ? 'Aktif' : 'Non-Aktif'})</option>)}
-                  </select>
+              <div className="mb-6 flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Pilih Ujian Aktif</label>
+                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={selectedExamForMonitor} onChange={e => setSelectedExamForMonitor(e.target.value)}>
+                          {visibleExams.map(e => <option key={e.id} value={e.id}>{e.title} ({e.isActive ? 'Aktif' : 'Non-Aktif'})</option>)}
+                      </select>
+                  </div>
+                  <div className="w-full md:w-48">
+                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Filter Kelas</label>
+                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={monitoringClassFilter} onChange={e => setMonitoringClassFilter(e.target.value)}>
+                          <option value="">Semua Kelas</option>
+                          {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                  </div>
+                  <div className="w-full md:w-48">
+                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Status</label>
+                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={monitoringStatusFilter} onChange={e => setMonitoringStatusFilter(e.target.value as any)}>
+                          <option value="all">Semua Status</option>
+                          <option value="finished">Sudah Selesai</option>
+                          <option value="unfinished">Belum Mengerjakan</option>
+                      </select>
+                  </div>
               </div>
 
               {selectedMonitorExam ? (
                   <div className="flex-1 bg-slate-900 border border-white/10 overflow-auto">
                       <div className="p-4 border-b border-white/10 flex gap-6 text-sm">
                           <div className="text-slate-400">Total Peserta: <span className="text-white font-bold">{targetedStudents.length}</span></div>
-                          <div className="text-slate-400">Sudah Mengerjakan: <span className="text-green-400 font-bold">{currentResults.length}</span></div>
-                          <div className="text-slate-400">Belum: <span className="text-red-400 font-bold">{targetedStudents.length - currentResults.length}</span></div>
+                          <div className="text-slate-400">Sudah Mengerjakan: <span className="text-green-400 font-bold">{targetedStudents.filter(s => currentResults.some(r => r.studentId === s.id)).length}</span></div>
+                          <div className="text-slate-400">Belum: <span className="text-red-400 font-bold">{targetedStudents.filter(s => !currentResults.some(r => r.studentId === s.id)).length}</span></div>
                       </div>
                       <table className="w-full text-left text-sm text-slate-300">
                           <thead className="bg-black/50 text-slate-500 uppercase text-xs">
@@ -370,13 +557,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </tr>
                           </thead>
                           <tbody>
-                              {targetedStudents.map((s, idx) => {
-                                  const res = currentResults.find(r => r.studentId === s.id);
+                              {displayData.map((item, idx) => {
+                                  const res = item.result;
                                   return (
-                                      <tr key={s.id} className="border-b border-white/5 hover:bg-white/5">
+                                      <tr key={item.id} className="border-b border-white/5 hover:bg-white/5">
                                           <td className="p-3 w-12 text-center">{idx + 1}</td>
-                                          <td className="p-3 font-medium text-white">{s.name}</td>
-                                          <td className="p-3">{s.class}</td>
+                                          <td className="p-3 font-medium text-white">{item.name}</td>
+                                          <td className="p-3">{item.class}</td>
                                           <td className="p-3">
                                               {res ? <span className="px-2 py-1 bg-green-900 text-green-400 text-xs font-bold rounded">SELESAI</span> : <span className="px-2 py-1 bg-slate-800 text-slate-500 text-xs font-bold rounded">BELUM</span>}
                                           </td>
@@ -393,13 +580,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       );
   }
 
-  // --- BANK SOAL TAB (Enhanced) ---
+  // --- BANK SOAL TAB (Enhanced & Scroll Fixed) ---
   if (activeTab === 'questions') {
     return (
-      <div className="p-8 flex flex-col h-full">
-         <div className="flex justify-between mb-4"><h2 className="text-2xl font-black text-white uppercase"><BookOpen className="inline mr-2 text-yellow-500"/> Bank Soal</h2><div className="flex bg-slate-800 rounded"><button onClick={() => setBankSubTab('config')} className={`px-4 py-2 text-xs font-bold ${bankSubTab==='config'?'bg-blue-600 text-white':'text-slate-400'}`}>Paket</button><button onClick={() => setBankSubTab('input')} className={`px-4 py-2 text-xs font-bold ${bankSubTab==='input'?'bg-blue-600 text-white':'text-slate-400'}`}>Input</button></div></div>
+      <div className="p-8 flex flex-col h-full overflow-hidden">
+         <div className="flex justify-between mb-4 flex-none"><h2 className="text-2xl font-black text-white uppercase"><BookOpen className="inline mr-2 text-yellow-500"/> Bank Soal</h2><div className="flex bg-slate-800 rounded"><button onClick={() => setBankSubTab('config')} className={`px-4 py-2 text-xs font-bold ${bankSubTab==='config'?'bg-blue-600 text-white':'text-slate-400'}`}>Paket</button><button onClick={() => setBankSubTab('input')} className={`px-4 py-2 text-xs font-bold ${bankSubTab==='input'?'bg-blue-600 text-white':'text-slate-400'}`}>Input</button></div></div>
          {bankSubTab === 'config' && (
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden min-h-0">
                  <div className="bg-slate-900 p-6 border border-white/10 h-fit">
                      <h3 className="font-bold text-white mb-4">Buat Paket</h3>
                      <input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama" value={newPacketName} onChange={e=>setNewPacketName(e.target.value)}/>
@@ -411,33 +598,93 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
              </div>
          )}
          {bankSubTab === 'input' && (
-             <div className="flex-1 flex flex-col">
-                 <select className="w-full bg-slate-900 border border-slate-700 p-2 text-white mb-4" value={selectedPacketId} onChange={e => {setSelectedPacketId(e.target.value); setActiveSlot(null);}}><option value="">Pilih Paket Soal</option>{visiblePackets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+             <div className="flex-1 flex flex-col min-h-0">
+                 <select className="w-full bg-slate-900 border border-slate-700 p-2 text-white mb-4 flex-none" value={selectedPacketId} onChange={e => {setSelectedPacketId(e.target.value); setActiveSlot(null);}}><option value="">Pilih Paket Soal</option>{visiblePackets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
                  {selectedPacketId && (
-                     <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 overflow-hidden">
+                     <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 overflow-hidden min-h-0">
                          <div className="bg-slate-900 border border-white/10 overflow-auto p-2"><div className="grid grid-cols-5 gap-1">{Array.from({length: visiblePackets.find(p=>p.id===selectedPacketId)?.totalQuestions||0}).map((_,i)=><button key={i} onClick={()=>prepareSlotForm(i+1)} className={`p-2 text-xs font-bold border ${activeSlot===i+1?'bg-yellow-500 text-black':'text-slate-400 border-slate-700'}`}>{i+1}</button>)}</div></div>
-                         <div className="lg:col-span-3 bg-slate-900 border border-white/10 p-4 overflow-auto">
+                         <div className="lg:col-span-3 bg-slate-900 border border-white/10 p-4 overflow-y-auto flex flex-col min-h-0">
                              {activeSlot ? (
-                                 <div className="space-y-4">
+                                 <div className="space-y-4 flex-1">
                                      <div className="flex justify-between"><h3 className="text-white font-bold">Edit Soal {activeSlot}</h3><select className="bg-black text-white p-1 text-xs" value={manualType} onChange={e=>setManualType(e.target.value as QuestionType)}><option value={QuestionType.SINGLE}>Pilihan Ganda</option><option value={QuestionType.COMPLEX}>PG Kompleks</option><option value={QuestionType.MATCHING}>Menjodohkan</option></select></div>
-                                     <div className="space-y-2">
-                                         <label className="text-xs text-slate-400">Stimulus (Teks Panjang)</label>
-                                         <textarea className="w-full bg-black p-2 text-white border border-slate-700 font-serif leading-relaxed" rows={6} placeholder="Masukkan teks bacaan, cerita, atau data stimulus di sini..." value={newStimulus} onChange={e=>setNewStimulus(e.target.value)}/>
-                                     </div>
-                                     <div className="space-y-2">
-                                         <label className="text-xs text-slate-400">URL Gambar (Opsional)</label>
-                                         <div className="flex gap-2">
-                                             <input className="flex-1 bg-black p-2 text-white border border-slate-700 text-sm" placeholder="https://..." value={newQuestionImage} onChange={e=>setNewQuestionImage(e.target.value)}/>
+                                     
+                                     {/* STIMULUS SECTION */}
+                                     <div className="space-y-2 border-b border-slate-700 pb-4">
+                                         <div className="flex gap-2 mb-2">
+                                             <button onClick={() => setStimulusType('text')} className={`text-xs px-3 py-1 rounded ${stimulusType === 'text' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Teks</button>
+                                             <button onClick={() => setStimulusType('image')} className={`text-xs px-3 py-1 rounded ${stimulusType === 'image' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Gambar</button>
                                          </div>
-                                         {newQuestionImage && <img src={newQuestionImage} alt="Preview" className="h-32 object-contain border border-slate-700 bg-black/50"/>}
+                                         
+                                         {stimulusType === 'text' ? (
+                                             <textarea className="w-full bg-black p-2 text-white border border-slate-700 font-serif leading-relaxed" rows={4} placeholder="Masukkan teks stimulus di sini..." value={newStimulus} onChange={e=>setNewStimulus(e.target.value)}/>
+                                         ) : (
+                                             <div className="space-y-2">
+                                                 <input type="file" accept="image/*" ref={imageUploadRef} onChange={handleImageUpload} className="hidden" />
+                                                 <div className="flex gap-2">
+                                                     <button onClick={() => imageUploadRef.current?.click()} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 text-xs rounded flex items-center gap-2 border border-slate-600"><Upload size={14}/> Upload Gambar</button>
+                                                     {newQuestionImage && <button onClick={() => setNewQuestionImage('')} className="text-red-500 text-xs">Hapus</button>}
+                                                 </div>
+                                                 {newQuestionImage && <img src={newQuestionImage} alt="Stimulus" className="max-h-40 object-contain border border-slate-700 bg-black/50 rounded"/>}
+                                             </div>
+                                         )}
                                      </div>
+
+                                     {/* QUESTION TEXT */}
                                      <div className="space-y-2">
                                          <label className="text-xs text-slate-400">Pertanyaan</label>
                                          <textarea className="w-full bg-black p-2 text-white border border-slate-700 font-medium" rows={3} placeholder="Pertanyaan..." value={newQuestionText} onChange={e=>setNewQuestionText(e.target.value)}/>
                                      </div>
                                      
-                                     {manualType===QuestionType.SINGLE && newOptions.map((o,i)=><div key={i} className="flex gap-2"><button onClick={()=>setSingleCorrectIndex(i)} className={`w-8 ${singleCorrectIndex===i?'bg-green-600':'bg-slate-700'} text-white`}>{String.fromCharCode(65+i)}</button><input className="flex-1 bg-black p-1 text-white text-sm border border-slate-700" value={o} onChange={e=>{const c=[...newOptions];c[i]=e.target.value;setNewOptions(c)}}/></div>)}
-                                     <button onClick={handleSaveQuestionSlot} className="w-full bg-blue-600 text-white py-2 font-bold text-xs uppercase">Simpan Soal</button>
+                                     {/* ANSWER INPUTS */}
+                                     <div className="border-t border-slate-700 pt-4">
+                                         <label className="text-xs text-slate-400 block mb-2">Jawaban ({manualType})</label>
+                                         
+                                         {manualType === QuestionType.SINGLE && newOptions.map((o,i)=>(
+                                             <div key={i} className="flex gap-2 mb-2">
+                                                 <button onClick={()=>setSingleCorrectIndex(i)} className={`w-8 h-8 flex items-center justify-center border ${singleCorrectIndex===i?'bg-green-600 border-green-500 text-white':'bg-slate-800 border-slate-700 text-slate-500'}`}>{String.fromCharCode(65+i)}</button>
+                                                 <input className="flex-1 bg-black p-1 text-white text-sm border border-slate-700" value={o} onChange={e=>{const c=[...newOptions];c[i]=e.target.value;setNewOptions(c)}}/>
+                                             </div>
+                                         ))}
+
+                                         {manualType === QuestionType.COMPLEX && newOptions.map((o,i)=>(
+                                             <div key={i} className="flex gap-2 mb-2">
+                                                 <button 
+                                                     onClick={() => {
+                                                         if (complexCorrectIndices.includes(i)) setComplexCorrectIndices(complexCorrectIndices.filter(idx => idx !== i));
+                                                         else setComplexCorrectIndices([...complexCorrectIndices, i]);
+                                                     }} 
+                                                     className={`w-8 h-8 flex items-center justify-center border ${complexCorrectIndices.includes(i) ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
+                                                 >
+                                                     <Check size={14} className={complexCorrectIndices.includes(i) ? 'opacity-100' : 'opacity-0'}/>
+                                                 </button>
+                                                 <input className="flex-1 bg-black p-1 text-white text-sm border border-slate-700" value={o} onChange={e=>{const c=[...newOptions];c[i]=e.target.value;setNewOptions(c)}}/>
+                                             </div>
+                                         ))}
+
+                                         {manualType === QuestionType.MATCHING && (
+                                             <div className="space-y-2">
+                                                 {matchingPairs.map((pair, idx) => (
+                                                     <div key={idx} className="flex gap-2 items-center">
+                                                         <input className="flex-1 bg-black p-1 text-white text-sm border border-slate-700" placeholder="Pernyataan Kiri" value={pair.left} onChange={e => {const n = [...matchingPairs]; n[idx].left = e.target.value; setMatchingPairs(n)}} />
+                                                         <ArrowRight size={14} className="text-slate-500"/>
+                                                         <input className="flex-1 bg-black p-1 text-white text-sm border border-slate-700" placeholder="Pasangan Kanan" value={pair.right} onChange={e => {const n = [...matchingPairs]; n[idx].right = e.target.value; setMatchingPairs(n)}} />
+                                                         <button onClick={() => setMatchingPairs(matchingPairs.filter((_, i) => i !== idx))} className="text-red-500"><X size={14}/></button>
+                                                     </div>
+                                                 ))}
+                                                 <button onClick={() => setMatchingPairs([...matchingPairs, {left:'', right:''}])} className="text-xs text-blue-400 font-bold">+ Tambah Baris</button>
+                                             </div>
+                                         )}
+                                     </div>
+
+                                     {/* PREVIEW BOX */}
+                                     <div className="mt-6 bg-slate-800/50 p-4 border border-slate-700 rounded-lg">
+                                         <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Preview Tampilan Soal</p>
+                                         {stimulusType === 'image' && newQuestionImage && <img src={newQuestionImage} className="max-h-32 mb-2 rounded border border-slate-600"/>}
+                                         {stimulusType === 'text' && newStimulus && <p className="text-sm text-slate-300 mb-2 italic bg-black/20 p-2 border-l-2 border-blue-500 whitespace-pre-wrap">{newStimulus}</p>}
+                                         <p className="text-white font-bold text-sm">{newQuestionText || "[Teks Pertanyaan]"}</p>
+                                     </div>
+
+                                     <button onClick={handleSaveQuestionSlot} className="w-full bg-blue-600 text-white py-3 font-bold text-xs uppercase mt-4">Simpan Soal</button>
                                  </div>
                              ) : <p className="text-slate-500 text-center mt-10">Pilih nomor soal untuk mulai mengedit.</p>}
                          </div>
@@ -459,6 +706,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama Ujian" value={newExamTitle} onChange={e=>setNewExamTitle(e.target.value)}/>
                       <select className="w-full bg-black p-2 mb-2 text-white border border-slate-700" value={newExamPacketId} onChange={e=>setNewExamPacketId(e.target.value)}><option value="">Pilih Paket</option>{visiblePackets.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
                       <div className="flex gap-2 mb-2"><input type="datetime-local" className="bg-black text-white text-xs p-1 w-1/2" value={newExamStart} onChange={e=>setNewExamStart(e.target.value)}/><input type="datetime-local" className="bg-black text-white text-xs p-1 w-1/2" value={newExamEnd} onChange={e=>setNewExamEnd(e.target.value)}/></div>
+                      <div className="mb-2"><input type="number" className="bg-black text-white text-xs p-2 w-full border border-slate-700" placeholder="Durasi (Menit)" value={newExamDuration} onChange={e=>setNewExamDuration(parseInt(e.target.value))}/></div>
                       <div className="grid grid-cols-3 gap-2 mb-4">{CLASS_LIST.map(c=><button key={c} onClick={()=>{if(newExamClasses.includes(c))setNewExamClasses(newExamClasses.filter(x=>x!==c));else setNewExamClasses([...newExamClasses,c])}} className={`text-[10px] border p-1 ${newExamClasses.includes(c)?'bg-yellow-600 text-black':'text-slate-400'}`}>{c}</button>)}</div>
                       <button onClick={handleCreateExam} className="w-full bg-blue-600 text-white py-2 font-bold">Jadwalkan</button>
                   </div>
@@ -470,7 +718,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   <div>
                                       <h4 className="font-bold text-white text-lg">{e.title}</h4>
                                       <p className="text-xs text-yellow-500 mb-1">{pkt?.name} <span className="text-slate-500">|</span> {pkt?.category}</p>
-                                      <p className="text-xs text-slate-400 mb-1">{e.classTarget.join(', ')}</p>
+                                      <p className="text-xs text-slate-400 mb-1">{e.classTarget.join(', ')} <span className="text-slate-600 mx-2">|</span> {e.durationMinutes} Menit</p>
                                       <p className="text-[10px] text-slate-500 font-mono">{formatDateRange(e.scheduledStart, e.scheduledEnd)}</p>
                                   </div>
                                   <div className="flex gap-2 items-start">
