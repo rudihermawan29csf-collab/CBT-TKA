@@ -5,7 +5,7 @@ import { MOCK_STUDENTS, MOCK_QUESTIONS, MOCK_EXAMS, CLASS_LIST, MOCK_PACKETS } f
 import { Sidebar } from './components/Sidebar';
 import { AdminDashboard } from './views/AdminDashboard';
 import { StudentDashboard } from './views/StudentDashboard';
-import { User, Lock, Crosshair, Target, AlertTriangle, ChevronRight, ChevronDown, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { User, Lock, Crosshair, Target, AlertTriangle, ChevronRight, ChevronDown, Cloud, CloudOff, RefreshCw, ExternalLink } from 'lucide-react';
 
 const DEFAULT_SETTINGS: SchoolSettings = {
   schoolName: 'SMPN 3 Pacet',
@@ -55,6 +55,7 @@ const App = () => {
   // Server Connection State
   const [isConnected, setIsConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState('dashboard');
   
@@ -77,9 +78,35 @@ const App = () => {
   const fetchDataFromServer = async () => {
       if(!APPS_SCRIPT_URL) return;
       setIsSyncing(true);
+      setSyncError('');
+      
       try {
-          const res = await fetch(`${APPS_SCRIPT_URL}?action=read`);
-          const json = await res.json();
+          // Add cache busting timestamp and minimal headers to avoid CORS preflight issues
+          const res = await fetch(`${APPS_SCRIPT_URL}?action=read&t=${Date.now()}`, {
+             method: 'GET',
+             redirect: 'follow', // Important for Apps Script redirects
+             headers: {
+                 'Content-Type': 'text/plain;charset=utf-8',
+             }
+          });
+          
+          if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+
+          const text = await res.text();
+          
+          // Validate if response is HTML (Error Page) instead of JSON
+          if (text.trim().startsWith('<')) {
+             console.error("Server returned HTML instead of JSON. Check deployment permissions.");
+             throw new Error("Invalid Server Response (HTML)");
+          }
+
+          let json;
+          try {
+              json = JSON.parse(text);
+          } catch (e) {
+              throw new Error("JSON Parse Failed");
+          }
+
           if(json.status === 'success') {
               // Update state from server data if not empty
               if(json.data.Students?.length) setStudents(json.data.Students);
@@ -87,16 +114,14 @@ const App = () => {
               if(json.data.Packets?.length) setPackets(json.data.Packets);
               if(json.data.Exams?.length) setExams(json.data.Exams);
               
-              // Handle Settings mapping
-              if(json.data.Settings?.length) {
-                  const s = json.data.Settings;
-                  // Simple mapping assuming order or key value pair logic in sheet
-                  // For now, we keep local settings or map manually if structure matches
-              }
               setIsConnected(true);
+              console.log("Sync Success:", json.data);
+          } else {
+              throw new Error("Server status not success");
           }
-      } catch (err) {
+      } catch (err: any) {
           console.error("Failed to connect to server:", err);
+          setSyncError(err.message || "Unknown Error");
           setIsConnected(false);
       } finally {
           setIsSyncing(false);
@@ -121,7 +146,7 @@ const App = () => {
            setLoginError('Password Salah');
         }
       } else if (selectedAdminUser === 'guru_numerasi') {
-         if (adminPass === 'guru 123') { 
+         if (adminPass === 'guru123') { 
            setSession({ role: Role.TEACHER_NUMERASI, name: 'Guru Numerasi', id: 'guru_num' });
            setActiveTab('questions'); 
         } else {
@@ -162,6 +187,10 @@ const App = () => {
     setLoginError('');
   };
 
+  const handleOpenDebugUrl = () => {
+     window.open(`${APPS_SCRIPT_URL}?action=read`, '_blank');
+  };
+
   // --- Login View (Theme: Dark/Gaming/Free Fire) ---
   if (!session) {
     const studentsInClass = students.filter(s => s.class === selectedClass);
@@ -174,19 +203,38 @@ const App = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-600/10 via-slate-900/50 to-black pointer-events-none"></div>
 
         {/* Server Status Indicator */}
-        <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-50">
             {isSyncing ? (
-                <div className="bg-blue-900/50 text-blue-300 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/30 flex items-center gap-2">
+                <div className="bg-blue-900/50 text-blue-300 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/30 flex items-center gap-2 shadow-lg">
                     <RefreshCw size={12} className="animate-spin"/> Syncing...
                 </div>
             ) : isConnected ? (
-                <div className="bg-green-900/50 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30 flex items-center gap-2">
-                    <Cloud size={12}/> Terkoneksi dengan Server
+                <div className="bg-green-900/50 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30 flex items-center gap-2 shadow-lg">
+                    <Cloud size={12}/> Server Connected
                 </div>
             ) : (
-                <div className="bg-red-900/50 text-red-400 px-3 py-1 rounded-full text-xs font-bold border border-red-500/30 flex items-center gap-2 cursor-pointer" onClick={handleSync} title="Klik untuk refresh">
-                    <CloudOff size={12}/> Offline (Local Mode)
+                <div className="flex gap-2">
+                   <button 
+                      onClick={handleOpenDebugUrl}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded-full text-xs font-bold border border-slate-600 flex items-center gap-2 shadow-lg transition-colors"
+                      title="Buka URL server di tab baru untuk cek akses"
+                   >
+                       <ExternalLink size={12}/> Debug URL
+                   </button>
+                   <button 
+                      onClick={handleSync}
+                      className="bg-red-900/80 hover:bg-red-800 text-red-200 px-3 py-1 rounded-full text-xs font-bold border border-red-500/50 flex items-center gap-2 shadow-lg transition-colors animate-pulse"
+                      title="Klik untuk mencoba koneksi ulang"
+                   >
+                       <CloudOff size={12}/> Offline (Retry)
+                   </button>
                 </div>
+            )}
+            {/* Sync Error Message Toast */}
+            {!isConnected && !isSyncing && syncError && (
+                 <div className="text-[10px] text-red-400 bg-black/80 px-2 py-1 rounded border border-red-900/50 max-w-[200px] truncate">
+                     Error: {syncError}
+                 </div>
             )}
         </div>
 
