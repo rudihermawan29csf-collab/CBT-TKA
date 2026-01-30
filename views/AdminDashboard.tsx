@@ -83,10 +83,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- Analysis State ---
   const [analysisSubTab, setAnalysisSubTab] = useState<'item' | 'recap'>('item');
-  const [selectedExamIdForAnalysis, setSelectedExamIdForAnalysis] = useState<string>(exams[0]?.id || '');
+  const [selectedExamIdForAnalysis, setSelectedExamIdForAnalysis] = useState<string>('');
   const [selectedClassForRecap, setSelectedClassForRecap] = useState<string>(CLASS_LIST[0]);
 
-  const selectedExamForAnalysis = exams.find(e => e.id === selectedExamIdForAnalysis) || exams[0];
+  // Ensure default selection when exams load
+  useEffect(() => {
+      if (exams.length > 0 && !selectedExamIdForAnalysis) {
+          setSelectedExamIdForAnalysis(exams[0].id);
+      }
+  }, [exams, selectedExamIdForAnalysis]);
+
+  const selectedExamForAnalysis = useMemo(() => 
+      exams.find(e => e.id === selectedExamIdForAnalysis),
+  [exams, selectedExamIdForAnalysis]);
 
   const visiblePackets = useMemo(() => {
     if (userRole === Role.ADMIN) return packets;
