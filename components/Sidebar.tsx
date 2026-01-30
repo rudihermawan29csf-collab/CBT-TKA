@@ -40,19 +40,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, onTabChange, 
   };
 
   return (
+    // Structure: Flex Col, Height Full (parent is fixed), so this fits perfectly
     <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-slate-900 border-r border-white/10 text-white flex flex-col h-full shadow-2xl relative transition-all duration-300`}>
-      <div className="absolute top-0 right-0 w-px h-full bg-gradient-to-b from-transparent via-yellow-500/50 to-transparent opacity-50"></div>
+      <div className="absolute top-0 right-0 w-px h-full bg-gradient-to-b from-transparent via-yellow-500/50 to-transparent opacity-50 pointer-events-none"></div>
       
-      {/* Header & Toggle */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between flex-none">
+      {/* 1. Header (Fixed Height) */}
+      <div className="p-4 border-b border-white/5 flex items-center justify-between flex-none h-16">
         {!isCollapsed && (
-            <div className="flex items-center gap-3 animate-fade-in">
-                <div className="w-8 h-8 bg-black/50 border border-white/10 text-black rounded transform -skew-x-12 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+            <div className="flex items-center gap-3 animate-fade-in overflow-hidden">
+                <div className="w-8 h-8 bg-black/50 border border-white/10 text-black rounded transform -skew-x-12 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.4)] flex-none">
                     <img src="https://image2url.com/r2/default/images/1769001049680-d981c280-6340-4989-8563-7b08134c189a.png" alt="Logo" className="h-6 w-6 object-contain skew-x-12" />
                 </div>
-                <div>
-                    <h1 className="text-sm font-black tracking-tighter text-white leading-tight uppercase italic">
-                      {user.role === Role.ADMIN ? 'Admin' : 'Guru'}
+                <div className="min-w-0">
+                    <h1 className="text-sm font-black tracking-tighter text-white leading-tight uppercase italic truncate">
+                      {user.role === Role.ADMIN ? 'Admin Panel' : 'Guru Panel'}
                     </h1>
                 </div>
             </div>
@@ -66,12 +67,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, onTabChange, 
       </div>
 
       {!isCollapsed && (
-          <div className="px-6 mt-6 mb-2 flex-none">
+          <div className="px-6 mt-4 mb-2 flex-none">
              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Menu Utama</p>
           </div>
       )}
 
-      {/* Navigation Area - SCROLLABLE */}
+      {/* 2. Navigation Area (Takes Remaining Space & Scrolls) */}
       <nav className={`flex-1 px-3 space-y-2 overflow-y-auto custom-scrollbar min-h-0 ${isCollapsed ? 'mt-4' : ''}`}>
         {getMenuItems().map((item) => (
           <button
@@ -84,17 +85,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, onTabChange, 
             }`}
             title={isCollapsed ? item.label : ''}
           >
-            <item.icon size={isCollapsed ? 24 : 18} className={`${activeTab === item.id ? 'text-black' : 'text-slate-500 group-hover:text-yellow-500'} transition-colors`} />
-            {!isCollapsed && <span>{item.label}</span>}
+            <item.icon size={isCollapsed ? 24 : 18} className={`${activeTab === item.id ? 'text-black' : 'text-slate-500 group-hover:text-yellow-500'} transition-colors flex-none`} />
+            {!isCollapsed && <span className="truncate">{item.label}</span>}
           </button>
         ))}
       </nav>
 
-      {/* User Profile - FIXED BOTTOM */}
-      <div className={`p-4 bg-black/20 backdrop-blur-sm border-t border-white/10 flex-none ${isCollapsed ? 'flex justify-center' : ''}`}>
+      {/* 3. User Profile / Logout (Fixed Bottom) */}
+      <div className={`p-4 bg-black/40 backdrop-blur-sm border-t border-white/10 flex-none ${isCollapsed ? 'flex justify-center' : ''}`}>
         {!isCollapsed ? (
-            <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded bg-slate-800 border border-slate-700 text-yellow-500 flex items-center justify-center">
+            <div className="flex items-center gap-3 mb-3 overflow-hidden">
+                <div className="w-10 h-10 rounded bg-slate-800 border border-slate-700 text-yellow-500 flex items-center justify-center flex-none">
                     <User size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
