@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Student, Exam, Question, QuestionType, QuestionCategory, ExamResult } from '../types';
-import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock, Square, Calendar } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock, Square, Calendar, Archive } from 'lucide-react';
 
 interface StudentDashboardProps {
   student: Student;
@@ -50,6 +50,27 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   const myHistory = useMemo(() => {
       return examResults.filter(r => r.studentId === student.id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [examResults, student.id]);
+
+  // --- SPLIT EXAMS INTO ACTIVE & PAST ---
+  const { activeMissions, pastMissions } = useMemo(() => {
+      const now = new Date();
+      const active: Exam[] = [];
+      const past: Exam[] = [];
+
+      studentExams.forEach(exam => {
+          const end = new Date(exam.scheduledEnd);
+          const isDone = myHistory.some(h => h.examId === exam.id);
+          const isEnded = now > end;
+
+          if (isDone || isEnded) {
+              past.push(exam);
+          } else {
+              active.push(exam);
+          }
+      });
+
+      return { activeMissions: active, pastMissions: past };
+  }, [studentExams, myHistory]);
 
   useEffect(() => {
     if (activeExam && navScrollRef.current) {
@@ -438,6 +459,45 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       })}
     </div>
   );
+
+  const renderExamCard = (exam: Exam, isPast: boolean = false) => {
+      const now = new Date();
+      const start = new Date(exam.scheduledStart);
+      const end = new Date(exam.scheduledEnd);
+      const isTimeValid = now >= start && now <= end;
+      const isEnded = now > end;
+      const isDone = myHistory.some(h => h.examId === exam.id); 
+
+      return (
+          <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid && !isDone ? 'hover:border-yellow-500' : 'opacity-75 grayscale'}`}>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none"></div>
+              <div className="p-5">
+                  <div className="flex justify-between items-start mb-3">
+                      {isDone ? (
+                          <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1"><Check size={10}/> Completed</span>
+                      ) : (
+                          <span className="bg-blue-900/40 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded">Ranked</span>
+                      )}
+                      <Clock size={14} className="text-slate-500"/>
+                  </div>
+                  <h3 className="text-lg font-black text-white uppercase italic tracking-wide mb-1 leading-tight group-hover:text-yellow-400 transition-colors">{exam.title}</h3>
+                  <p className="text-[10px] text-yellow-500 font-mono mb-2">{formatDateRange(exam.scheduledStart, exam.scheduledEnd)}</p>
+                  
+                  <div className="flex items-center gap-3 text-xs text-slate-400 font-mono mb-4 border-t border-white/5 pt-3">
+                      <span className="flex items-center gap-1"><Target size={12}/> {exam.questions.length} Qs</span>
+                      <span className="flex items-center gap-1"><Clock size={12}/> {exam.durationMinutes}m</span>
+                  </div>
+                  {isDone ? (
+                      <button disabled className="w-full py-3 bg-emerald-900/30 text-emerald-500 font-black uppercase tracking-widest text-xs rounded border border-emerald-900/50 cursor-default">Mission Accomplished</button>
+                  ) : isTimeValid ? (
+                      <button onClick={() => handleStartExam(exam)} className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-black font-black uppercase tracking-widest text-xs rounded transition-all active:scale-95 shadow-md flex items-center justify-center gap-2">Start Mission <ChevronRight size={14}/></button>
+                  ) : (
+                      <button disabled className="w-full py-3 bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs rounded flex items-center justify-center gap-2 cursor-not-allowed">{isEnded ? 'Mission Ended' : 'Coming Soon'}</button>
+                  )}
+              </div>
+          </div>
+      );
+  };
 
   // --- RENDER LOGIC ---
   
@@ -835,51 +895,36 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                  <p className="text-slate-500 text-xs">CLASS: {student.class}</p>
                              </div>
                         </div>
-                        {studentExams.length === 0 ? (
+                        
+                        {/* --- ACTIVE MISSIONS SECTION --- */}
+                        {activeMissions.length === 0 && pastMissions.length === 0 ? (
                             <div className="border border-slate-700 bg-slate-900/50 p-10 text-center rounded-xl mt-10">
                                 <Target size={48} className="mx-auto text-slate-600 mb-4"/>
                                 <p className="text-slate-500 text-lg uppercase tracking-wide">No Active Missions</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-20">
-                                {studentExams.map(exam => {
-                                    const now = new Date();
-                                    const start = new Date(exam.scheduledStart);
-                                    const end = new Date(exam.scheduledEnd);
-                                    const isTimeValid = now >= start && now <= end;
-                                    const isEnded = now > end;
-                                    const isDone = myHistory.some(h => h.examId === exam.id); // Check if done
+                            <div className="pb-20">
+                                {activeMissions.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
+                                        {activeMissions.map(exam => renderExamCard(exam, false))}
+                                    </div>
+                                )}
 
-                                    return (
-                                        <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid && !isDone ? 'hover:border-yellow-500' : 'opacity-75 grayscale'}`}>
-                                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none"></div>
-                                            <div className="p-5">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    {isDone ? (
-                                                        <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1"><Check size={10}/> Completed</span>
-                                                    ) : (
-                                                        <span className="bg-blue-900/40 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded">Ranked</span>
-                                                    )}
-                                                    <Clock size={14} className="text-slate-500"/>
-                                                </div>
-                                                <h3 className="text-lg font-black text-white uppercase italic tracking-wide mb-1 leading-tight group-hover:text-yellow-400 transition-colors">{exam.title}</h3>
-                                                <p className="text-[10px] text-yellow-500 font-mono mb-2">{formatDateRange(exam.scheduledStart, exam.scheduledEnd)}</p>
-                                                
-                                                <div className="flex items-center gap-3 text-xs text-slate-400 font-mono mb-4 border-t border-white/5 pt-3">
-                                                    <span className="flex items-center gap-1"><Target size={12}/> {exam.questions.length} Qs</span>
-                                                    <span className="flex items-center gap-1"><Clock size={12}/> {exam.durationMinutes}m</span>
-                                                </div>
-                                                {isDone ? (
-                                                    <button disabled className="w-full py-3 bg-emerald-900/30 text-emerald-500 font-black uppercase tracking-widest text-xs rounded border border-emerald-900/50 cursor-default">Mission Accomplished</button>
-                                                ) : isTimeValid ? (
-                                                    <button onClick={() => handleStartExam(exam)} className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-black font-black uppercase tracking-widest text-xs rounded transition-all active:scale-95 shadow-md flex items-center justify-center gap-2">Start Mission <ChevronRight size={14}/></button>
-                                                ) : (
-                                                    <button disabled className="w-full py-3 bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs rounded flex items-center justify-center gap-2 cursor-not-allowed">{isEnded ? 'Mission Ended' : 'Coming Soon'}</button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                {activeMissions.length > 0 && pastMissions.length > 0 && (
+                                    <div className="relative flex items-center py-8">
+                                        <div className="flex-grow border-t border-slate-700"></div>
+                                        <span className="flex-shrink-0 mx-4 text-slate-500 text-xs uppercase font-bold tracking-widest flex items-center gap-2">
+                                            <Archive size={14}/> Misi Selesai / Berakhir
+                                        </span>
+                                        <div className="flex-grow border-t border-slate-700"></div>
+                                    </div>
+                                )}
+
+                                {pastMissions.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 opacity-70 hover:opacity-100 transition-opacity duration-300">
+                                        {pastMissions.map(exam => renderExamCard(exam, true))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
