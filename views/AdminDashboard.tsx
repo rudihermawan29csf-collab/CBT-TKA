@@ -725,6 +725,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                          {stimulusType === 'image' && newQuestionImage && <img src={newQuestionImage} className="max-h-32 mb-2 rounded border border-slate-600"/>}
                                          {stimulusType === 'text' && newStimulus && <p className="text-sm text-slate-300 mb-2 italic bg-black/20 p-2 border-l-2 border-blue-500 whitespace-pre-wrap">{newStimulus}</p>}
                                          <p className="text-white font-bold text-sm">{newQuestionText || "[Teks Pertanyaan]"}</p>
+                                         
+                                         {/* OPTION PREVIEW */}
+                                         {manualType === QuestionType.SINGLE && (
+                                             <div className="mt-3 space-y-2">
+                                                 {newOptions.map((opt, i) => (
+                                                     <div key={i} className={`p-2 rounded border text-xs flex items-center gap-2 ${singleCorrectIndex === i ? 'bg-green-900/30 border-green-600 text-green-400' : 'border-slate-700 text-slate-400'}`}>
+                                                         <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleCorrectIndex === i ? 'border-green-500 bg-green-500 text-black' : 'border-slate-500'}`}>
+                                                             {singleCorrectIndex === i && <div className="w-2 h-2 bg-black rounded-full" />}
+                                                         </div>
+                                                         <span>{opt || `Opsi ${String.fromCharCode(65+i)}`}</span>
+                                                     </div>
+                                                 ))}
+                                             </div>
+                                         )}
+                                         {manualType === QuestionType.COMPLEX && (
+                                             <div className="mt-3 space-y-2">
+                                                 {newOptions.map((opt, i) => (
+                                                     <div key={i} className={`p-2 rounded border text-xs flex items-center gap-2 ${complexCorrectIndices.includes(i) ? 'bg-blue-900/30 border-blue-600 text-blue-400' : 'border-slate-700 text-slate-400'}`}>
+                                                         <div className={`w-4 h-4 rounded border flex items-center justify-center ${complexCorrectIndices.includes(i) ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-500'}`}>
+                                                              {complexCorrectIndices.includes(i) && <Check size={10} />}
+                                                         </div>
+                                                         <span>{opt || `Opsi ${i+1}`}</span>
+                                                     </div>
+                                                 ))}
+                                             </div>
+                                         )}
+                                         {manualType === QuestionType.MATCHING && (
+                                             <div className="mt-3 bg-slate-900 border border-slate-700 rounded p-2">
+                                                 <table className="w-full text-xs text-slate-300">
+                                                     <thead><tr><th className="text-left p-1 text-slate-500">Kiri</th><th className="p-1"></th><th className="text-left p-1 text-slate-500">Kanan</th></tr></thead>
+                                                     <tbody>
+                                                         {matchingPairs.map((pair, i) => (
+                                                             <tr key={i} className="border-b border-slate-800 last:border-0">
+                                                                 <td className="p-2">{pair.left || '-'}</td>
+                                                                 <td className="p-2 text-center text-slate-600"><ArrowRight size={12}/></td>
+                                                                 <td className="p-2">{pair.right || '-'}</td>
+                                                             </tr>
+                                                         ))}
+                                                     </tbody>
+                                                 </table>
+                                             </div>
+                                         )}
                                      </div>
 
                                      <button onClick={handleSaveQuestionSlot} className="w-full bg-blue-600 text-white py-3 font-bold text-xs uppercase mt-4">Simpan Soal</button>
