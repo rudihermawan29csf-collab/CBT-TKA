@@ -107,6 +107,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const formatDateRange = (start: string, end: string) => {
+      const s = new Date(start);
+      const e = new Date(end);
+      return `Mulai: ${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} — Selesai: ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
+  };
+
   // Fisher-Yates Shuffle Helper
   function shuffleArray<T>(array: T[]): T[] {
       const arr = [...array];
@@ -828,7 +834,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                                     <Clock size={14} className="text-slate-500"/>
                                                 </div>
                                                 <h3 className="text-lg font-black text-white uppercase italic tracking-wide mb-1 leading-tight group-hover:text-yellow-400 transition-colors">{exam.title}</h3>
-                                                <p className="text-xs text-slate-500 mb-4">{start.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                                                <p className="text-[10px] text-yellow-500 font-mono mb-2">{formatDateRange(exam.scheduledStart, exam.scheduledEnd)}</p>
+                                                
                                                 <div className="flex items-center gap-3 text-xs text-slate-400 font-mono mb-4 border-t border-white/5 pt-3">
                                                     <span className="flex items-center gap-1"><Target size={12}/> {exam.questions.length} Qs</span>
                                                     <span className="flex items-center gap-1"><Clock size={12}/> {exam.durationMinutes}m</span>
@@ -891,6 +898,45 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                              </div>
                                              <p className="text-xs text-slate-400 uppercase tracking-widest mt-2">Total Score</p>
                                          </div>
+                                         
+                                         {/* --- NEW: VISUAL CORRECT / INCORRECT GRID --- */}
+                                         <div className="mb-8">
+                                            <p className="text-xs text-slate-400 font-bold uppercase mb-2">Detail Jawaban (Benar/Salah)</p>
+                                            <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                                                <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+                                                    {(() => {
+                                                       const relatedExam = exams.find(e => e.id === selectedHistory.examId);
+                                                       if (!relatedExam) return <p className="text-xs text-red-500">Data ujian tidak ditemukan.</p>;
+                                                       
+                                                       // We iterate through ORIGINAL questions. 
+                                                       // Note: If 'selectedHistory' stores shuffled indices, we assume the student ID matches and the key logic is consistent.
+                                                       // For simplicity in this demo, we check simple correctness from the stored answers.
+                                                       return relatedExam.questions.map((q, idx) => {
+                                                           const ans = selectedHistory.answers[q.id];
+                                                           let isCorrect = false;
+                                                           if (q.type === QuestionType.SINGLE) {
+                                                               if (ans === q.correctAnswerIndex) isCorrect = true;
+                                                           } else if (q.type === QuestionType.COMPLEX) {
+                                                               const userSet = new Set(ans as number[]);
+                                                               const correctSet = new Set(q.correctAnswerIndices);
+                                                               if (userSet.size === correctSet.size && [...userSet].every(x => correctSet.has(x))) isCorrect = true;
+                                                           }
+                                                           
+                                                           return (
+                                                               <div key={q.id} className={`aspect-square flex items-center justify-center text-xs font-black rounded border ${isCorrect ? 'bg-green-600 border-green-500 text-white' : 'bg-red-900/50 border-red-500 text-red-400'}`}>
+                                                                   {idx + 1}
+                                                               </div>
+                                                           );
+                                                       });
+                                                    })()}
+                                                </div>
+                                                <div className="flex gap-4 mt-2 justify-center text-[10px] uppercase font-bold text-slate-500">
+                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-green-600 rounded"></div> Benar</span>
+                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-900/50 rounded border border-red-500"></div> Salah</span>
+                                                </div>
+                                            </div>
+                                         </div>
+
                                          <div className="grid grid-cols-2 gap-4 mb-8">
                                              <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 text-center">
                                                  <p className="text-xs text-purple-400 uppercase font-bold mb-1">Literasi</p>
