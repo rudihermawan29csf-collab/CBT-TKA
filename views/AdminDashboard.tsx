@@ -112,6 +112,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [userRole]);
 
   // --- HELPER FUNCTIONS ---
+  
+  // Word/HTML Cleanup Helper
+  const cleanWordHtml = (html: string) => {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return tempDiv.textContent || tempDiv.innerText || "";
+  };
+  
   const getItemAnalysis = (questionId: string, question: Question) => {
       const results = examResults.filter(r => r.examId === selectedExamIdForAnalysis);
       const totalAttempts = results.length;
@@ -329,10 +337,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           qData.correctAnswerIndices = complexCorrectIndices; 
       }
       else if (manualType === QuestionType.MATCHING) { 
-          // For Matching, options are usually labels for columns e.g. "Benar", "Salah" if simple, or we rely on matchingPairs logic
-          // Here we assume simple matchingPairs logic.
-          qData.options = ['Benar', 'Salah']; 
-          qData.matchingPairs = matchingPairs.filter(p => p.left && p.right); 
+          // New Logic for Matching: options contain [Label1, Label2], matchingPairs contains {left: statement, right: answer}
+          qData.options = [newOptions[0] || 'Benar', newOptions[1] || 'Salah']; 
+          qData.matchingPairs = matchingPairs.filter(p => p.left); 
       }
 
       if (editingQuestionId) setQuestions(prev => prev.map(q => q.id === editingQuestionId ? { ...q, ...qData } as Question : q));
@@ -371,15 +378,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               setNewOptions(existingQ.options || ['', '', '', '']); 
               setComplexCorrectIndices(existingQ.correctAnswerIndices || []); 
           }
-          else if (existingQ.type === QuestionType.MATCHING) { 
-              setMatchingPairs(existingQ.matchingPairs || [{left:'', right:''}]); 
+          else if (existingQ.type === QuestionType.MATCHING) {
+              // Ensure we have labels in options 0 and 1, defaulting if missing
+              const opts = existingQ.options && existingQ.options.length >= 2 ? existingQ.options : ['Benar', 'Salah', '', ''];
+              setNewOptions(opts);
+              setMatchingPairs(existingQ.matchingPairs || [{left:'', right: opts[0]}]); 
           }
       } else {
           setEditingQuestionId(null); 
           setStimulusType('text'); setNewStimulus(''); setNewQuestionImage(''); setNewQuestionText('');
           
           if (type === QuestionType.MATCHING) { 
-              setMatchingPairs([{left:'', right:''}]); 
+              setNewOptions(['Benar', 'Salah', '', '']);
+              setMatchingPairs([{left:'', right: 'Benar'}]); 
           } else { 
               setNewOptions(['', '', '', '']); 
               setSingleCorrectIndex(0); 
@@ -753,7 +764,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                          <div className="lg:col-span-3 bg-slate-900 border border-white/10 p-4 overflow-y-auto flex flex-col min-h-0">
                              {activeSlot ? (
                                  <div className="space-y-4 flex-1">
-                                     <div className="flex justify-between"><h3 className="text-white font-bold">Edit Soal {activeSlot}</h3><select className="bg-black text-white p-1 text-xs" value={manualType} onChange={e=>setManualType(e.target.value as QuestionType)}><option value={QuestionType.SINGLE}>Pilihan Ganda</option><option value={QuestionType.COMPLEX}>PG Kompleks</option><option value={QuestionType.MATCHING}>Menjodohkan</option></select></div>
+                                     <div className="flex justify-between"><h3 className="text-white font-bold">Edit Soal {activeSlot}</h3><select className="bg-black text-white p-1 text-xs" value={manualType} onChange={e=>setManualType(e.target.value as QuestionType)}><option value={QuestionType.SINGLE}>Pilihan Ganda</option><option value={QuestionType.COMPLEX}>PG Kompleks</option><option value={QuestionType.MATCHING}>Menjodohkan / Benar Salah</option></select></div>
                                      
                                      {/* STIMULUS SECTION */}
                                      <div className="space-y-2 border-b border-slate-700 pb-4">
@@ -763,7 +774,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                          </div>
                                          
                                          {stimulusType === 'text' ? (
-                                             <textarea className="w-full bg-black p-2 text-white border border-slate-700 font-serif leading-relaxed" rows={4} placeholder="Masukkan teks stimulus di sini..." value={newStimulus} onChange={e=>setNewStimulus(e.target.value)}/>
+                                             <textarea className="w-full bg-black p-2 text-white border border-slate-700 font-serif leading-relaxed" rows={4} placeholder="Masukkan teks stimulus di sini..." value={newStimulus} onChange={e=>setNewStimulus(cleanWordHtml(e.target.value))}/>
                                          ) : (
                                              <div className="space-y-2">
                                                  <input type="file" accept="image/*" ref={imageUploadRef} onChange={handleImageUpload} className="hidden" />
@@ -779,7 +790,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                      {/* QUESTION TEXT */}
                                      <div className="space-y-2">
                                          <label className="text-xs text-slate-400">Pertanyaan</label>
-                                         <textarea className="w-full bg-black p-2 text-white border border-slate-700 font-medium" rows={3} placeholder="Pertanyaan..." value={newQuestionText} onChange={e=>setNewQuestionText(e.target.value)}/>
+                                         <textarea className="w-full bg-black p-2 text-white border border-slate-700 font-medium" rows={3} placeholder="Pertanyaan..." value={newQuestionText} onChange={e=>setNewQuestionText(cleanWordHtml(e.target.value))}/>
                                      </div>
                                      
                                      {/* ANSWER INPUTS */}
@@ -809,16 +820,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                          ))}
 
                                          {manualType === QuestionType.MATCHING && (
-                                             <div className="space-y-2">
-                                                 {matchingPairs.map((pair, idx) => (
-                                                     <div key={idx} className="flex gap-2 items-center">
-                                                         <input className="flex-1 bg-black p-1 text-white text-sm border border-slate-700" placeholder="Pernyataan Kiri" value={pair.left} onChange={e => {const n = [...matchingPairs]; n[idx].left = e.target.value; setMatchingPairs(n)}} />
-                                                         <ArrowRight size={14} className="text-slate-500"/>
-                                                         <input className="flex-1 bg-black p-1 text-white text-sm border border-slate-700" placeholder="Pasangan Kanan" value={pair.right} onChange={e => {const n = [...matchingPairs]; n[idx].right = e.target.value; setMatchingPairs(n)}} />
-                                                         <button onClick={() => setMatchingPairs(matchingPairs.filter((_, i) => i !== idx))} className="text-red-500"><X size={14}/></button>
+                                             <div className="space-y-4">
+                                                 <div className="grid grid-cols-2 gap-4">
+                                                     <div>
+                                                         <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block">Label Kolom 1 (Misal: Benar/Sesuai)</label>
+                                                         <input className="w-full bg-black p-2 text-white text-sm border border-slate-700" placeholder="Contoh: Benar" value={newOptions[0]} onChange={e => {const n = [...newOptions]; n[0] = e.target.value; setNewOptions(n)}} />
                                                      </div>
-                                                 ))}
-                                                 <button onClick={() => setMatchingPairs([...matchingPairs, {left:'', right:''}])} className="text-xs text-blue-400 font-bold">+ Tambah Baris</button>
+                                                     <div>
+                                                         <label className="text-[10px] text-red-400 font-bold uppercase mb-1 block">Label Kolom 2 (Misal: Salah/Tidak Sesuai)</label>
+                                                         <input className="w-full bg-black p-2 text-white text-sm border border-slate-700" placeholder="Contoh: Salah" value={newOptions[1]} onChange={e => {const n = [...newOptions]; n[1] = e.target.value; setNewOptions(n)}} />
+                                                     </div>
+                                                 </div>
+                                                 
+                                                 <div className="bg-slate-800/30 p-2 rounded">
+                                                     <label className="text-[10px] text-slate-400 font-bold uppercase mb-2 block">Daftar Pernyataan & Kunci Jawaban</label>
+                                                     {matchingPairs.map((pair, idx) => (
+                                                         <div key={idx} className="flex gap-2 items-center mb-2">
+                                                             <span className="text-slate-500 font-mono text-xs w-6 text-center">{idx+1}.</span>
+                                                             <input className="flex-1 bg-black p-2 text-white text-sm border border-slate-700" placeholder="Isi Pernyataan..." value={pair.left} onChange={e => {const n = [...matchingPairs]; n[idx].left = e.target.value; setMatchingPairs(n)}} />
+                                                             <div className="w-32">
+                                                                <select className="w-full bg-black text-white p-2 text-sm border border-slate-700 cursor-pointer" value={pair.right} onChange={e => {const n = [...matchingPairs]; n[idx].right = e.target.value; setMatchingPairs(n)}}>
+                                                                    <option value={newOptions[0]}>{newOptions[0] || 'Opsi 1'}</option>
+                                                                    <option value={newOptions[1]}>{newOptions[1] || 'Opsi 2'}</option>
+                                                                </select>
+                                                             </div>
+                                                             <button onClick={() => setMatchingPairs(matchingPairs.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-400 p-2"><X size={14}/></button>
+                                                         </div>
+                                                     ))}
+                                                     <button onClick={() => setMatchingPairs([...matchingPairs, {left:'', right: newOptions[0]}])} className="text-xs bg-blue-600/20 text-blue-400 px-3 py-1 rounded font-bold hover:bg-blue-600/30">+ Tambah Pernyataan</button>
+                                                 </div>
                                              </div>
                                          )}
                                      </div>
@@ -828,7 +858,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                          <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Preview Tampilan Soal</p>
                                          {stimulusType === 'image' && newQuestionImage && <img src={newQuestionImage} className="max-h-32 mb-2 rounded border border-slate-600"/>}
                                          {stimulusType === 'text' && newStimulus && <p className="text-sm text-slate-300 mb-2 italic bg-black/20 p-2 border-l-2 border-blue-500 whitespace-pre-wrap">{newStimulus}</p>}
-                                         <p className="text-white font-bold text-sm">{newQuestionText || "[Teks Pertanyaan]"}</p>
+                                         <p className="text-white font-bold text-sm mb-4">{newQuestionText || "[Teks Pertanyaan]"}</p>
                                          
                                          {/* OPTION PREVIEW */}
                                          {manualType === QuestionType.SINGLE && (
@@ -856,15 +886,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                              </div>
                                          )}
                                          {manualType === QuestionType.MATCHING && (
-                                             <div className="mt-3 bg-slate-900 border border-slate-700 rounded p-2">
+                                             <div className="mt-3 border border-slate-700 rounded overflow-hidden">
                                                  <table className="w-full text-xs text-slate-300">
-                                                     <thead><tr><th className="text-left p-1 text-slate-500">Kiri</th><th className="p-1"></th><th className="text-left p-1 text-slate-500">Kanan</th></tr></thead>
+                                                     <thead className="bg-slate-900 text-slate-400 font-bold uppercase">
+                                                         <tr>
+                                                             <th className="p-2 w-8 text-center border-r border-slate-700">No</th>
+                                                             <th className="p-2 text-left border-r border-slate-700">Pernyataan</th>
+                                                             <th className="p-2 text-center w-20 bg-green-900/20 text-green-500 border-r border-slate-700">{newOptions[0] || 'Opsi 1'}</th>
+                                                             <th className="p-2 text-center w-20 bg-red-900/20 text-red-500">{newOptions[1] || 'Opsi 2'}</th>
+                                                         </tr>
+                                                     </thead>
                                                      <tbody>
                                                          {matchingPairs.map((pair, i) => (
-                                                             <tr key={i} className="border-b border-slate-800 last:border-0">
-                                                                 <td className="p-2">{pair.left || '-'}</td>
-                                                                 <td className="p-2 text-center text-slate-600"><ArrowRight size={12}/></td>
-                                                                 <td className="p-2">{pair.right || '-'}</td>
+                                                             <tr key={i} className="border-b border-slate-800 last:border-0 hover:bg-white/5">
+                                                                 <td className="p-2 text-center border-r border-slate-800 font-mono text-slate-500">{i+1}</td>
+                                                                 <td className="p-2 border-r border-slate-800">{pair.left || '-'}</td>
+                                                                 <td className="p-2 text-center border-r border-slate-800">
+                                                                     <div className={`w-4 h-4 rounded-full border mx-auto flex items-center justify-center ${pair.right === newOptions[0] ? 'bg-green-500 border-green-400' : 'border-slate-600'}`}>
+                                                                         {pair.right === newOptions[0] && <div className="w-2 h-2 bg-black rounded-full"/>}
+                                                                     </div>
+                                                                 </td>
+                                                                 <td className="p-2 text-center">
+                                                                     <div className={`w-4 h-4 rounded-full border mx-auto flex items-center justify-center ${pair.right === newOptions[1] ? 'bg-red-500 border-red-400' : 'border-slate-600'}`}>
+                                                                         {pair.right === newOptions[1] && <div className="w-2 h-2 bg-black rounded-full"/>}
+                                                                     </div>
+                                                                 </td>
                                                              </tr>
                                                          ))}
                                                      </tbody>
