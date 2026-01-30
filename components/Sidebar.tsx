@@ -44,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, onTabChange, 
       <div className="absolute top-0 right-0 w-px h-full bg-gradient-to-b from-transparent via-yellow-500/50 to-transparent opacity-50"></div>
       
       {/* Header & Toggle */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between">
+      <div className="p-4 border-b border-white/5 flex items-center justify-between flex-none">
         {!isCollapsed && (
             <div className="flex items-center gap-3 animate-fade-in">
                 <div className="w-8 h-8 bg-black/50 border border-white/10 text-black rounded transform -skew-x-12 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.4)]">
@@ -66,12 +66,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, onTabChange, 
       </div>
 
       {!isCollapsed && (
-          <div className="px-6 mt-6 mb-2">
+          <div className="px-6 mt-6 mb-2 flex-none">
              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Menu Utama</p>
           </div>
       )}
 
-      <nav className={`flex-1 px-3 space-y-2 ${isCollapsed ? 'mt-4' : ''}`}>
+      {/* Navigation Area - SCROLLABLE */}
+      <nav className={`flex-1 px-3 space-y-2 overflow-y-auto custom-scrollbar min-h-0 ${isCollapsed ? 'mt-4' : ''}`}>
         {getMenuItems().map((item) => (
           <button
             key={item.id}
@@ -89,8 +90,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, onTabChange, 
         ))}
       </nav>
 
-      {/* User Profile */}
-      <div className={`p-4 bg-black/20 backdrop-blur-sm border-t border-white/10 ${isCollapsed ? 'flex justify-center' : ''}`}>
+      {/* User Profile - FIXED BOTTOM */}
+      <div className={`p-4 bg-black/20 backdrop-blur-sm border-t border-white/10 flex-none ${isCollapsed ? 'flex justify-center' : ''}`}>
         {!isCollapsed ? (
             <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded bg-slate-800 border border-slate-700 text-yellow-500 flex items-center justify-center">

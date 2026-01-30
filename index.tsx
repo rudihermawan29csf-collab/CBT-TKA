@@ -420,7 +420,7 @@ const App = () => {
         {/* Content Area */}
         <div className="flex-1 overflow-hidden relative flex flex-col">
             
-            <div className="flex-1 overflow-auto bg-transparent custom-scrollbar">
+            <div className="flex-1 overflow-hidden bg-transparent relative">
                 {session.role !== Role.STUDENT && (
                   <AdminDashboard
                     userRole={session.role} // Pass role to AdminDashboard
