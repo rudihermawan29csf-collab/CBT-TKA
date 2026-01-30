@@ -478,20 +478,47 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       );
   }
 
-  if (introStep === 2) { /* Rules Screen Code */
+  if (introStep === 2) { /* Rules Screen Code - OPTIMIZED FOR MOBILE SCROLLING */
       return (
-          <div className="min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-y-auto text-white">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 fixed"></div>
-              <div className="max-w-3xl w-full bg-slate-900/90 border border-white/10 p-8 md:p-12 relative shadow-2xl backdrop-blur-sm my-auto">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
-                  <h2 className="text-3xl font-black text-white mb-8 text-center uppercase tracking-widest flex items-center justify-center gap-3"><AlertCircle className="text-yellow-500" /> Aturan Pertempuran</h2>
-                  <div className="space-y-4 mb-8 text-slate-300 font-medium">
-                      <div className="flex gap-4 items-start"><span className="bg-slate-800 text-yellow-500 font-bold w-8 h-8 flex items-center justify-center rounded-sm shrink-0">1</span><p>Waktu ujian berjalan mundur. Jika waktu habis, jawaban tersimpan otomatis.</p></div>
-                      <div className="flex gap-4 items-start"><span className="bg-slate-800 text-yellow-500 font-bold w-8 h-8 flex items-center justify-center rounded-sm shrink-0">2</span><p>Pilih jawaban dengan hati-hati. Gunakan tombol "Ragu-ragu" (Flag) untuk menandai soal yang ingin diperiksa ulang.</p></div>
-                      <div className="flex gap-4 items-start"><span className="bg-slate-800 text-yellow-500 font-bold w-8 h-8 flex items-center justify-center rounded-sm shrink-0">3</span><p>Dilarang melakukan kecurangan (Pindah Tab/Minimize). Anda memiliki 3 nyawa. Jika habis, Anda akan tereliminasi (Diskualifikasi).</p></div>
-                      <div className="flex gap-4 items-start"><span className="bg-slate-800 text-yellow-500 font-bold w-8 h-8 flex items-center justify-center rounded-sm shrink-0">4</span><p>Klik tombol "Finish" hanya jika Anda yakin telah menyelesaikan semua soal.</p></div>
+          <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 text-white overflow-y-auto">
+              {/* Background */}
+              <div className="fixed inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none"></div>
+              
+              {/* Flex Container for Centering */}
+              <div className="min-h-full w-full flex flex-col items-center justify-center p-4 py-8 md:p-8">
+                  <div className="max-w-3xl w-full bg-slate-900/95 border border-white/10 p-6 md:p-10 relative shadow-2xl backdrop-blur-sm rounded-xl">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
+                      
+                      <h2 className="text-2xl md:text-3xl font-black text-white mb-6 text-center uppercase tracking-widest flex items-center justify-center gap-3">
+                        <AlertCircle className="text-yellow-500 flex-shrink-0" /> Aturan Main
+                      </h2>
+                      
+                      <div className="space-y-4 mb-8 text-slate-300 font-medium text-sm md:text-base">
+                          <div className="flex gap-3 items-start">
+                            <span className="bg-slate-800 text-yellow-500 font-bold w-6 h-6 flex items-center justify-center rounded-sm shrink-0 text-xs mt-0.5">1</span>
+                            <p>Waktu ujian berjalan mundur. Jika waktu habis, jawaban tersimpan otomatis.</p>
+                          </div>
+                          <div className="flex gap-3 items-start">
+                            <span className="bg-slate-800 text-yellow-500 font-bold w-6 h-6 flex items-center justify-center rounded-sm shrink-0 text-xs mt-0.5">2</span>
+                            <p>Pilih jawaban dengan hati-hati. Gunakan tombol "Ragu-ragu" untuk menandai soal.</p>
+                          </div>
+                          <div className="flex gap-3 items-start">
+                            <span className="bg-slate-800 text-yellow-500 font-bold w-6 h-6 flex items-center justify-center rounded-sm shrink-0 text-xs mt-0.5">3</span>
+                            <p className="text-red-400">Dilarang pindah aplikasi/tab. Anda memiliki 3 nyawa sebelum didiskualifikasi.</p>
+                          </div>
+                          <div className="flex gap-3 items-start">
+                            <span className="bg-slate-800 text-yellow-500 font-bold w-6 h-6 flex items-center justify-center rounded-sm shrink-0 text-xs mt-0.5">4</span>
+                            <p>Klik tombol "Finish" hanya jika yakin selesai.</p>
+                          </div>
+                      </div>
+
+                      <button 
+                        onClick={() => setIntroStep(3)} 
+                        className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-black text-lg uppercase tracking-[0.1em] shadow-lg transition-transform active:scale-95 rounded-lg flex items-center justify-center gap-2"
+                      >
+                        Masuk ke Lobby <ChevronRight size={20}/>
+                      </button>
                   </div>
-                  <button onClick={() => setIntroStep(3)} className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-black text-xl uppercase tracking-[0.2em] shadow-lg transition-transform active:scale-95">Masuk ke Lobby</button>
               </div>
           </div>
       );
