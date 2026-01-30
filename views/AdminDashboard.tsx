@@ -141,13 +141,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return `${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} s.d ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
   };
 
-  // Handle Image Upload to Base64
+  // Handle Image Upload with Compression/Resizing
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
           const reader = new FileReader();
-          reader.onloadend = () => {
-              setNewQuestionImage(reader.result as string);
+          reader.onload = (event) => {
+              const img = new Image();
+              img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  let width = img.width;
+                  let height = img.height;
+                  const MAX_SIZE = 800; // Resize large images to max 800px
+
+                  if (width > height) {
+                      if (width > MAX_SIZE) {
+                          height *= MAX_SIZE / width;
+                          width = MAX_SIZE;
+                      }
+                  } else {
+                      if (height > MAX_SIZE) {
+                          width *= MAX_SIZE / height;
+                          height = MAX_SIZE;
+                      }
+                  }
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  ctx?.drawImage(img, 0, 0, width, height);
+                  
+                  // Compress to JPEG 70% quality to save space
+                  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                  setNewQuestionImage(dataUrl);
+              };
+              img.src = event.target?.result as string;
           };
           reader.readAsDataURL(file);
       }
@@ -185,6 +212,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           setStudents([...students, ...imported]); alert(`${imported.length} siswa berhasil diimpor.`); triggerSync();
       };
       reader.readAsBinaryString(file); if (studentFileRef.current) studentFileRef.current.value = '';
+  };
+
+  const handleEditPacket = (p: QuestionPacket) => {
+    setEditingPacketId(p.id);
+    setNewPacketName(p.name);
+    setNewPacketCategory(p.category);
+    setNewPacketTotal(p.totalQuestions);
   };
 
   const handleSavePacket = () => {
@@ -588,13 +622,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
          {bankSubTab === 'config' && (
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden min-h-0">
                  <div className="bg-slate-900 p-6 border border-white/10 h-fit">
-                     <h3 className="font-bold text-white mb-4">Buat Paket</h3>
+                     <h3 className="font-bold text-white mb-4">{editingPacketId ? 'Edit Paket' : 'Buat Paket'}</h3>
                      <input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama" value={newPacketName} onChange={e=>setNewPacketName(e.target.value)}/>
                      <select className="w-full bg-black p-2 mb-2 text-white border border-slate-700" value={newPacketCategory} onChange={(e) => setNewPacketCategory(e.target.value as QuestionCategory)} disabled={userRole !== Role.ADMIN}><option value={QuestionCategory.LITERASI}>Literasi</option><option value={QuestionCategory.NUMERASI}>Numerasi</option></select>
                      <input type="number" className="w-full bg-black p-2 mb-4 text-white border border-slate-700" placeholder="Total Soal" value={newPacketTotal} onChange={e=>setNewPacketTotal(parseInt(e.target.value))}/>
-                     <button onClick={handleSavePacket} className="w-full bg-blue-600 text-white py-2 font-bold">Simpan</button>
+                     <button onClick={handleSavePacket} className="w-full bg-blue-600 text-white py-2 font-bold">{editingPacketId ? 'Update' : 'Simpan'}</button>
+                     {editingPacketId && <button onClick={() => { setEditingPacketId(null); setNewPacketName(''); setNewPacketTotal(''); }} className="w-full bg-slate-700 text-white py-2 font-bold mt-2">Batal</button>}
                  </div>
-                 <div className="lg:col-span-2 overflow-auto space-y-2">{visiblePackets.map(p=><div key={p.id} className="bg-slate-900 border border-slate-700 p-3 flex justify-between"><div><p className="text-white font-bold">{p.name}</p><p className="text-xs text-slate-500">{p.category} | {p.totalQuestions} Soal</p></div><button onClick={()=>deletePacket(p.id)} className="text-red-500"><Trash2 size={16}/></button></div>)}</div>
+                 <div className="lg:col-span-2 overflow-auto space-y-2">{visiblePackets.map(p=>(
+                     <div key={p.id} className="bg-slate-900 border border-slate-700 p-3 flex justify-between items-center">
+                         <div><p className="text-white font-bold">{p.name}</p><p className="text-xs text-slate-500">{p.category} | {p.totalQuestions} Soal</p></div>
+                         <div className="flex gap-2">
+                             <button onClick={() => handleEditPacket(p)} className="text-yellow-500 hover:text-yellow-400"><Edit2 size={16}/></button>
+                             <button onClick={()=>deletePacket(p.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16}/></button>
+                         </div>
+                     </div>
+                 ))}</div>
              </div>
          )}
          {bankSubTab === 'input' && (
