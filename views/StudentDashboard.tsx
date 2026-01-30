@@ -7,15 +7,17 @@ interface StudentDashboardProps {
   exams: Exam[];
   activeTab: string;
   onLogout?: () => void;
-  examResults: ExamResult[]; // NEW: Receive Results
-  onSaveResult: (result: ExamResult) => void; // NEW: Save Function
+  examResults: ExamResult[]; 
+  onSaveResult: (result: ExamResult) => void; 
 }
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exams, activeTab, onLogout, examResults, onSaveResult }) => {
-  // --- INTRO FLOW STATE ---
   const [introStep, setIntroStep] = useState(0); 
 
   const [activeExam, setActiveExam] = useState<Exam | null>(null);
+  // NEW: State for randomized questions
+  const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
+  
   const [menuTab, setMenuTab] = useState<'LOBBY' | 'CAREER'>('LOBBY');
   const [selectedHistory, setSelectedHistory] = useState<ExamResult | null>(null);
 
@@ -105,6 +107,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // Fisher-Yates Shuffle Helper
+  function shuffleArray<T>(array: T[]): T[] {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+  }
+
   const handleStartExam = (exam: Exam) => {
     // Check if already taken
     const existing = myHistory.find(h => h.examId === exam.id);
@@ -113,6 +125,35 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
         return;
     }
 
+    // --- RANDOMIZATION LOGIC ---
+    // 1. Shuffle Questions Order
+    let examQuestions = shuffleArray(exam.questions);
+
+    // 2. Shuffle Options inside each question (Deep Copy to modify)
+    // We must map the new correct index after shuffling so grading works
+    examQuestions = examQuestions.map(q => {
+        if (q.type === QuestionType.SINGLE && q.options) {
+             // Create array of objects to track original index
+             // q.correctAnswerIndex is the index in the original options array
+             const optionsWithIndex = q.options.map((opt, i) => ({ opt, originalIndex: i }));
+             const shuffledOptions = shuffleArray(optionsWithIndex);
+             
+             // Find where the original correct answer went
+             // The original correct index was 'q.correctAnswerIndex'
+             // We look for the option that had 'originalIndex' === 'q.correctAnswerIndex'
+             const newCorrectIndex = shuffledOptions.findIndex(o => o.originalIndex === q.correctAnswerIndex);
+             
+             return {
+                 ...q,
+                 options: shuffledOptions.map(o => o.opt),
+                 correctAnswerIndex: newCorrectIndex
+             };
+        }
+        // Ideally we should also shuffle Matching pairs order, but keeping it simple for now
+        return q;
+    });
+
+    setShuffledQuestions(examQuestions);
     setActiveExam(exam);
     setTimeLeft(exam.durationMinutes * 60);
     setCurrentQuestionIndex(0);
@@ -157,7 +198,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
   const handleSaveAndNext = (qId: string) => {
     if (activeExam) {
-        if (currentQuestionIndex < activeExam.questions.length - 1) {
+        if (currentQuestionIndex < shuffledQuestions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
         } else {
             alert("Ini adalah soal terakhir. Silahkan di cek jawaban terlebih dahulu sebelum menekan tombol Finish.");
@@ -177,7 +218,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
     let numerasiTotal = 0;
     let numerasiCorrect = 0;
 
-    activeExam.questions.forEach((q) => {
+    // Use shuffledQuestions for scoring because it contains the updated correct indices for this session
+    shuffledQuestions.forEach((q) => {
       let isCorrect = false;
       const userAnswer = answers[q.id];
       const isLiterasi = q.category === QuestionCategory.LITERASI;
@@ -208,7 +250,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       }
     });
 
-    const calculatedScore = activeExam.questions.length > 0 ? (correctCount / activeExam.questions.length) * 100 : 0;
+    const calculatedScore = shuffledQuestions.length > 0 ? (correctCount / shuffledQuestions.length) * 100 : 0;
     const litScore = literasiTotal > 0 ? (literasiCorrect / literasiTotal) * 100 : 0;
     const numScore = numerasiTotal > 0 ? (numerasiCorrect / numerasiTotal) * 100 : 0;
 
@@ -222,6 +264,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
     }
     
     // SAVE REAL RESULT
+    // Note: We save the answers based on the shuffled index. 
+    // In a production app, you might want to map this back to the original option text for analysis.
     const resultData: ExamResult = {
         id: `res-${Date.now()}`,
         examId: activeExam.id,
@@ -232,7 +276,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
         score: calculatedScore,
         literasiScore: litScore,
         numerasiScore: numScore,
-        answers: answers,
+        answers: answers, 
         timestamp: new Date().toISOString()
     };
     
@@ -366,7 +410,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
   const renderQuestionNavGrid = () => (
      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-      {activeExam?.questions.map((q, idx) => {
+      {shuffledQuestions.map((q, idx) => {
           const hasAns = answers[q.id] !== undefined;
           const isMarkedDoubt = doubts.has(q.id);
           let btnClass = 'bg-slate-800/50 text-slate-500 border border-slate-700'; 
@@ -457,7 +501,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                 <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent to-transparent ${isDisqualified ? 'via-red-500' : 'via-yellow-500'}`}></div>
                 <div className="mb-6 flex justify-center">
                     {isDisqualified ? (
-                        <AlertOctagon size={80} className="text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.6)]" />
+                        <AlertOctagon size={80} className="text-red-500 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
                     ) : (
                         <Trophy size={80} className="text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
                     )}
@@ -495,7 +539,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
   // 2. ACTIVE EXAM INTERFACE
   if (activeExam) {
-    const currentQuestion = activeExam.questions[currentQuestionIndex];
+    const currentQuestion = shuffledQuestions[currentQuestionIndex];
     const isDoubt = doubts.has(currentQuestion.id);
 
     return (
@@ -599,10 +643,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
           </div>
         </div>
         
-        {/* --- NEW: Horizontal Navigation Strip (Mobile Only) --- */}
+        {/* --- Horizontal Navigation Strip (Mobile Only) --- */}
         <div className="lg:hidden w-full bg-slate-900 border-b border-white/10 z-10 flex items-center">
             <div ref={navScrollRef} className="flex-1 flex overflow-x-auto gap-2 p-2 custom-scrollbar scroll-smooth snap-x">
-              {activeExam.questions.map((q, idx) => {
+              {shuffledQuestions.map((q, idx) => {
                  const hasAns = answers[q.id] !== undefined;
                  const isMarkedDoubt = doubts.has(q.id);
                  const isActive = idx === currentQuestionIndex;
@@ -620,56 +664,63 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
             </div>
             <div className="px-2 bg-slate-900 shadow-[-10px_0_10px_rgba(0,0,0,0.5)] z-20 h-full flex items-center border-l border-white/10">
                 <span className="text-[10px] text-slate-500 font-mono uppercase text-center block leading-tight">
-                  <span className="text-white block font-bold">{currentQuestionIndex + 1}</span> of {activeExam.questions.length}
+                  <span className="text-white block font-bold">{currentQuestionIndex + 1}</span> of {shuffledQuestions.length}
                 </span>
             </div>
         </div>
 
         <div className="flex-1 flex overflow-hidden relative z-10">
-          <div className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
-            <div className="max-w-5xl mx-auto">
-              <div className="bg-slate-900/80 backdrop-blur-md p-6 md:p-10 rounded-none border-t-2 border-yellow-500 shadow-2xl min-h-[500px] flex flex-col relative">
-                <div className="flex justify-between items-start mb-8 border-b border-slate-700 pb-4">
-                  <div className="flex items-center gap-3">
-                      <span className="bg-yellow-500 text-black px-3 py-1 text-sm font-black uppercase transform -skew-x-12"><span className="skew-x-12">Question {currentQuestionIndex + 1}</span></span>
-                      {isDoubt && (<span className="bg-orange-600 text-white px-2 py-1 text-xs font-bold uppercase rounded flex items-center gap-1"><Flag size={12} fill="currentColor" /> Ragu-ragu</span>)}
-                  </div>
-                  <Crosshair size={24} className="text-yellow-500/50" />
-                </div>
-                {currentQuestion.stimulus && (
-                   <div className="mb-8 p-6 bg-emerald-900/20 border border-emerald-500/30 rounded-sm relative">
-                      <div className="absolute top-0 left-0 bg-emerald-600 text-black text-[10px] font-black px-2 py-0.5 uppercase tracking-widest">INTEL</div>
-                      <p className="text-emerald-100/90 leading-relaxed text-lg mt-2 font-medium whitespace-pre-wrap">{currentQuestion.stimulus}</p>
-                   </div>
-                )}
-                {currentQuestion.image && (
-                   <div className="w-full mb-8 flex flex-col items-center bg-slate-900/50 p-4 rounded-xl border border-slate-700 relative group">
-                      <div className="absolute top-4 left-4 flex items-center gap-2">
-                         <div className="bg-slate-800 p-1.5 rounded-md text-slate-400"><ImageIcon size={16} /></div>
-                         <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Visual Data</p>
+          {/* LEFT SIDE: Question + Bottom Buttons */}
+          <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
+                <div className="max-w-5xl mx-auto">
+                  <div className="bg-slate-900/80 backdrop-blur-md p-6 md:p-10 rounded-none border-t-2 border-yellow-500 shadow-2xl min-h-[400px] flex flex-col relative">
+                    <div className="flex justify-between items-start mb-8 border-b border-slate-700 pb-4">
+                      <div className="flex items-center gap-3">
+                          <span className="bg-yellow-500 text-black px-3 py-1 text-sm font-black uppercase transform -skew-x-12"><span className="skew-x-12">Question {currentQuestionIndex + 1}</span></span>
+                          {isDoubt && (<span className="bg-orange-600 text-white px-2 py-1 text-xs font-bold uppercase rounded flex items-center gap-1"><Flag size={12} fill="currentColor" /> Ragu-ragu</span>)}
                       </div>
-                      <img src={currentQuestion.image} alt="Lampiran Soal" className="max-w-full h-auto max-h-[400px] object-contain rounded-lg shadow-lg border border-slate-600 mt-8 md:mt-0" />
-                   </div>
-                )}
-                <p className="text-2xl md:text-3xl text-white leading-relaxed mb-10 font-bold drop-shadow-sm whitespace-pre-wrap">{currentQuestion.text}</p>
-                <div className="mb-6 flex-1">
-                  {currentQuestion.type === QuestionType.SINGLE && renderSingleChoice(currentQuestion)}
-                  {currentQuestion.type === QuestionType.COMPLEX && renderComplexChoice(currentQuestion)}
-                  {currentQuestion.type === QuestionType.MATCHING && renderMatching(currentQuestion)}
+                      <Crosshair size={24} className="text-yellow-500/50" />
+                    </div>
+                    {currentQuestion.stimulus && (
+                       <div className="mb-8 p-6 bg-emerald-900/20 border border-emerald-500/30 rounded-sm relative">
+                          <div className="absolute top-0 left-0 bg-emerald-600 text-black text-[10px] font-black px-2 py-0.5 uppercase tracking-widest">INTEL</div>
+                          <p className="text-emerald-100/90 leading-relaxed text-lg mt-2 font-medium whitespace-pre-wrap">{currentQuestion.stimulus}</p>
+                       </div>
+                    )}
+                    {currentQuestion.image && (
+                       <div className="w-full mb-8 flex flex-col items-center bg-slate-900/50 p-4 rounded-xl border border-slate-700 relative group">
+                          <div className="absolute top-4 left-4 flex items-center gap-2">
+                             <div className="bg-slate-800 p-1.5 rounded-md text-slate-400"><ImageIcon size={16} /></div>
+                             <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Visual Data</p>
+                          </div>
+                          <img src={currentQuestion.image} alt="Lampiran Soal" className="max-w-full h-auto max-h-[400px] object-contain rounded-lg shadow-lg border border-slate-600 mt-8 md:mt-0" />
+                       </div>
+                    )}
+                    <p className="text-2xl md:text-3xl text-white leading-relaxed mb-10 font-bold drop-shadow-sm whitespace-pre-wrap">{currentQuestion.text}</p>
+                    <div className="mb-6 flex-1">
+                      {currentQuestion.type === QuestionType.SINGLE && renderSingleChoice(currentQuestion)}
+                      {currentQuestion.type === QuestionType.COMPLEX && renderComplexChoice(currentQuestion)}
+                      {currentQuestion.type === QuestionType.MATCHING && renderMatching(currentQuestion)}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 md:gap-8 mt-6">
-                <button onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))} disabled={currentQuestionIndex === 0} className="group flex items-center justify-center space-x-2 px-6 py-4 bg-slate-800 border-b-4 border-slate-950 text-slate-300 hover:bg-slate-700 font-bold uppercase">
-                  <ChevronLeft size={20} /> <span>Prev</span>
-                </button>
-                <button onClick={() => toggleDoubt(currentQuestion.id)} className={`flex items-center justify-center space-x-2 px-6 py-4 border-b-4 font-bold uppercase transition-all ${isDoubt ? 'bg-orange-600 text-white border-orange-800' : 'bg-slate-800 text-yellow-500 border-slate-950'}`}>
-                  <Flag size={20} fill={isDoubt ? "currentColor" : "none"} /> <span>{isDoubt ? 'Ragu' : 'Mark'}</span>
-                </button>
-                <button onClick={() => handleSaveAndNext(currentQuestion.id)} className="group flex items-center justify-center space-x-2 px-6 py-4 bg-yellow-600 border-b-4 border-yellow-800 text-black hover:bg-yellow-500 font-black uppercase">
-                  <span>Next</span> <ChevronRight size={20} />
-                </button>
+
+              {/* FIXED ACTION BUTTONS (Sticky Bottom) */}
+              <div className="p-4 bg-black/80 backdrop-blur border-t border-white/10 z-20">
+                  <div className="max-w-5xl mx-auto grid grid-cols-3 gap-4 md:gap-8">
+                    <button onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))} disabled={currentQuestionIndex === 0} className="group flex items-center justify-center space-x-2 px-4 py-3 bg-slate-800 border-b-4 border-slate-950 text-slate-300 hover:bg-slate-700 font-bold uppercase rounded text-sm md:text-base disabled:opacity-50">
+                      <ChevronLeft size={20} /> <span>Prev</span>
+                    </button>
+                    <button onClick={() => toggleDoubt(currentQuestion.id)} className={`flex items-center justify-center space-x-2 px-4 py-3 border-b-4 font-bold uppercase transition-all rounded text-sm md:text-base ${isDoubt ? 'bg-orange-600 text-white border-orange-800' : 'bg-slate-800 text-yellow-500 border-slate-950'}`}>
+                      <Flag size={20} fill={isDoubt ? "currentColor" : "none"} /> <span>{isDoubt ? 'Ragu' : 'Mark'}</span>
+                    </button>
+                    <button onClick={() => handleSaveAndNext(currentQuestion.id)} className="group flex items-center justify-center space-x-2 px-4 py-3 bg-yellow-600 border-b-4 border-yellow-800 text-black hover:bg-yellow-500 font-black uppercase rounded text-sm md:text-base">
+                      <span>Next</span> <ChevronRight size={20} />
+                    </button>
+                  </div>
               </div>
-            </div>
           </div>
           
           <div className="w-72 bg-black/80 backdrop-blur border-l border-white/10 p-4 overflow-y-auto hidden lg:block">
