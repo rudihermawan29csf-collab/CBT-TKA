@@ -715,8 +715,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center opacity-20 pointer-events-none"></div>
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/90 via-slate-900/80 to-black/95 pointer-events-none"></div>
         
-        {/* UPDATED: Changed md:h-screen to md:h-full to ensure it fits the parent container */}
-        <div className="md:w-20 md:flex-col flex-row flex md:border-r border-t md:border-t-0 border-white/10 bg-black/60 backdrop-blur-md z-30 fixed bottom-0 w-full md:sticky md:top-0 md:h-full justify-around md:justify-start items-center md:pt-6 pb-safe">
+        <div className="md:w-20 md:flex-col flex-row flex md:border-r border-t md:border-t-0 border-white/10 bg-black/60 backdrop-blur-md z-30 fixed bottom-0 w-full md:static md:h-full justify-around md:justify-start items-center md:pt-6 pb-safe">
              <div className="hidden md:flex mb-8 w-14 h-14 bg-black/50 rounded-lg items-center justify-center transform -skew-x-12 mx-auto border border-white/10">
                  <img src="https://image2url.com/r2/default/images/1769001049680-d981c280-6340-4989-8563-7b08134c189a.png" alt="Logo" className="h-10 w-10 object-contain skew-x-12" />
              </div>
