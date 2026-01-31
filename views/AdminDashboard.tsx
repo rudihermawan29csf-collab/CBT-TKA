@@ -370,31 +370,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               setNewQuestionImage('');
           }
 
+          // Strict State Reset based on loaded type
           if (existingQ.type === QuestionType.SINGLE) { 
               setNewOptions(existingQ.options || ['', '', '', '']); 
-              setSingleCorrectIndex(existingQ.correctAnswerIndex || 0); 
+              setSingleCorrectIndex(existingQ.correctAnswerIndex || 0);
+              
+              // Reset others
+              setComplexCorrectIndices([]);
+              setMatchingPairs([{left:'', right: ''}]);
           }
           else if (existingQ.type === QuestionType.COMPLEX) { 
               setNewOptions(existingQ.options || ['', '', '', '']); 
-              setComplexCorrectIndices(existingQ.correctAnswerIndices || []); 
+              setComplexCorrectIndices(existingQ.correctAnswerIndices || []);
+              
+              // Reset others
+              setSingleCorrectIndex(0);
+              setMatchingPairs([{left:'', right: ''}]);
           }
           else if (existingQ.type === QuestionType.MATCHING) {
-              // Ensure we have labels in options 0 and 1, defaulting if missing
               const opts = existingQ.options && existingQ.options.length >= 2 ? existingQ.options : ['Benar', 'Salah', '', ''];
               setNewOptions(opts);
-              setMatchingPairs(existingQ.matchingPairs || [{left:'', right: opts[0]}]); 
+              setMatchingPairs(existingQ.matchingPairs || [{left:'', right: opts[0]}]);
+              
+              // Reset others
+              setSingleCorrectIndex(0);
+              setComplexCorrectIndices([]);
           }
       } else {
           setEditingQuestionId(null); 
           setStimulusType('text'); setNewStimulus(''); setNewQuestionImage(''); setNewQuestionText('');
+          
+          // Reset ALL states for new question to prevent leakage
+          setSingleCorrectIndex(0);
+          setComplexCorrectIndices([]);
           
           if (type === QuestionType.MATCHING) { 
               setNewOptions(['Benar', 'Salah', '', '']);
               setMatchingPairs([{left:'', right: 'Benar'}]); 
           } else { 
               setNewOptions(['', '', '', '']); 
-              setSingleCorrectIndex(0); 
-              setComplexCorrectIndices([]); 
+              setMatchingPairs([{left:'', right: 'Benar'}]); // Default reset
           }
       }
   };
@@ -764,7 +779,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                          <div className="lg:col-span-3 bg-slate-900 border border-white/10 p-4 overflow-y-auto flex flex-col min-h-0">
                              {activeSlot ? (
                                  <div className="space-y-4 flex-1">
-                                     <div className="flex justify-between"><h3 className="text-white font-bold">Edit Soal {activeSlot}</h3><select className="bg-black text-white p-1 text-xs" value={manualType} onChange={e=>setManualType(e.target.value as QuestionType)}><option value={QuestionType.SINGLE}>Pilihan Ganda</option><option value={QuestionType.COMPLEX}>PG Kompleks</option><option value={QuestionType.MATCHING}>Menjodohkan / Benar Salah</option></select></div>
+                                     <div className="flex justify-between">
+                                        <h3 className="text-white font-bold">Edit Soal {activeSlot}</h3>
+                                        <select 
+                                            className="bg-black text-white p-1 text-xs" 
+                                            value={manualType} 
+                                            onChange={e => {
+                                                const t = e.target.value as QuestionType;
+                                                setManualType(t);
+                                                // Auto-initialize defaults when switching types manually
+                                                if (t === QuestionType.MATCHING) {
+                                                    const currentOpts = [...newOptions];
+                                                    if (!currentOpts[0]) currentOpts[0] = 'Benar';
+                                                    if (!currentOpts[1]) currentOpts[1] = 'Salah';
+                                                    setNewOptions(currentOpts);
+                                                    
+                                                    // Only reset pairs if they look empty/invalid
+                                                    if (matchingPairs.length === 0 || (matchingPairs.length === 1 && !matchingPairs[0].left)) {
+                                                        setMatchingPairs([{left: '', right: currentOpts[0]}]);
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            <option value={QuestionType.SINGLE}>Pilihan Ganda</option>
+                                            <option value={QuestionType.COMPLEX}>PG Kompleks</option>
+                                            <option value={QuestionType.MATCHING}>Menjodohkan / Benar Salah</option>
+                                        </select>
+                                     </div>
                                      
                                      {/* STIMULUS SECTION */}
                                      <div className="space-y-2 border-b border-slate-700 pb-4">
