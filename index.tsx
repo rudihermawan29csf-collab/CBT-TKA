@@ -127,6 +127,9 @@ const App = () => {
               if(json.data.Questions?.length > 0) {
                   loadedQuestions = json.data.Questions.map((q: any) => ({
                       ...q,
+                      // FORCE STRING TYPE FOR IDs to prevent Sheet Number conversion issues
+                      packetId: String(q.packetId || ''),
+                      number: parseInt(q.number || '0'), 
                       options: safeJsonParse(q.options, []),
                       correctAnswerIndices: safeJsonParse(q.correctAnswerIndices, []),
                       matchingPairs: safeJsonParse(q.matchingPairs, [])
@@ -138,6 +141,7 @@ const App = () => {
               if(json.data.Packets?.length > 0) {
                   loadedPackets = json.data.Packets.map((p: any) => ({
                       ...p,
+                      id: String(p.id || ''), // Force String
                       questionTypes: safeJsonParse(p.questionTypes, {})
                   }));
                   setPackets(loadedPackets);
@@ -152,28 +156,31 @@ const App = () => {
                           isActiveBool = e.isActive.toLowerCase() === 'true';
                       }
 
+                      // FORCE STRING for ID matching
+                      const examPacketId = String(e.packetId || '');
+
                       // CRITICAL: Re-construct questions based on packetId
                       // This solves the issue of the 'questions' column being empty in the spreadsheet
                       let examQuestions: Question[] = [];
-                      if (e.packetId && loadedQuestions.length > 0) {
+                      if (examPacketId && loadedQuestions.length > 0) {
                           // Find packet to get totalQuestions limit
-                          const relatedPacket = loadedPackets.find(p => p.id === e.packetId);
-                          const limit = relatedPacket ? relatedPacket.totalQuestions : 999;
+                          const relatedPacket = loadedPackets.find(p => String(p.id) === examPacketId);
+                          const limit = relatedPacket ? Number(relatedPacket.totalQuestions) : 999;
 
-                          // Filter from master list
+                          // Filter from master list using STRICT STRING comparison
                           examQuestions = loadedQuestions
-                              .filter(q => q.packetId === e.packetId && (q.number || 0) <= limit)
+                              .filter(q => q.packetId === examPacketId && (q.number || 0) <= limit)
                               .sort((a, b) => (a.number || 0) - (b.number || 0));
                       }
 
                       // If hydration failed (maybe questions not loaded yet?), fallback to parsed questions from sheet
-                      // But priority is the master list hydration.
                       if (examQuestions.length === 0) {
                            examQuestions = safeJsonParse(e.questions, []);
                       }
 
                       return {
                           ...e,
+                          packetId: examPacketId,
                           classTarget: safeJsonParse(e.classTarget, []),
                           questions: examQuestions,
                           isActive: isActiveBool
@@ -221,6 +228,8 @@ const App = () => {
               Students: stateRef.current.students,
               Questions: stateRef.current.questions.map(q => ({
                   ...q,
+                  packetId: String(q.packetId || ''), // Ensure sent as string
+                  number: q.number || 0,
                   options: JSON.stringify(q.options || []),
                   correctAnswerIndices: JSON.stringify(q.correctAnswerIndices || []),
                   matchingPairs: JSON.stringify(q.matchingPairs || [])
@@ -231,6 +240,7 @@ const App = () => {
               })),
               Exams: stateRef.current.exams.map(e => ({
                   ...e,
+                  packetId: String(e.packetId || ''),
                   classTarget: JSON.stringify(e.classTarget || []),
                   // We send empty array for questions to save space in Sheet. 
                   // The App will re-hydrate them based on packetId on load.
