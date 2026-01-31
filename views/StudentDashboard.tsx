@@ -40,9 +40,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   const navScrollRef = useRef<HTMLDivElement>(null);
 
   // Filter exams: Show ALL exams for the student's class
+  // FIX: Case insensitive and whitespace insensitive matching for class names
   const studentExams = exams.filter((e) => {
-      const isTargetClass = e.classTarget.includes(student.class);
+      // Normalize student class string (remove spaces, uppercase) e.g., "VII A" -> "VIIA"
+      const studentClassNorm = student.class.replace(/\s+/g, '').toUpperCase();
+      
+      const isTargetClass = e.classTarget.some(target => {
+          const targetNorm = target.replace(/\s+/g, '').toUpperCase();
+          return targetNorm === studentClassNorm;
+      });
+
       const isActiveStatus = e.isActive;
+      // We return true if active AND class matches.
       return isActiveStatus && isTargetClass;
   });
 

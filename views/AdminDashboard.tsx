@@ -255,8 +255,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- HANDLERS ---
   const handleCreateExam = () => {
     if (!newExamTitle || !newExamPacketId || !newExamStart || !newExamEnd || newExamClasses.length === 0) { alert("Lengkapi data ujian."); return; }
-    const pktQuestions = questions.filter(q => q.packetId === newExamPacketId);
+    
+    // VALIDASI: Hanya ambil soal sesuai jumlah "Total Soal" pada paket
+    const packet = packets.find(p => p.id === newExamPacketId);
+    const maxQuestions = packet ? packet.totalQuestions : 999;
+    
+    const pktQuestions = questions
+        .filter(q => q.packetId === newExamPacketId && (q.number || 0) <= maxQuestions) // Pastikan tidak ada soal hantu (misal nomor 11 jika total 10)
+        .sort((a, b) => (a.number || 0) - (b.number || 0)); // Urutkan berdasarkan nomor soal
+
     if (pktQuestions.length === 0) { alert("Paket soal kosong."); return; }
+    
     const newExam: Exam = { id: `exam-${Date.now()}`, title: newExamTitle, packetId: newExamPacketId, durationMinutes: newExamDuration, classTarget: newExamClasses, scheduledStart: newExamStart, scheduledEnd: newExamEnd, questions: pktQuestions, isActive: true };
     if (setExams) setExams([...exams, newExam]);
     alert("Ujian dijadwalkan!"); setNewExamTitle(''); setNewExamPacketId(''); setNewExamClasses([]); setNewExamStart(''); setNewExamEnd(''); triggerSync();
