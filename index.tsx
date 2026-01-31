@@ -83,6 +83,18 @@ const App = () => {
       }
   }, []);
 
+  // Helper for safe JSON parsing
+  const safeJsonParse = (str: any, fallback: any) => {
+    if (typeof str !== 'string') return str || fallback; // If already object or null/undefined
+    if (!str || str.trim() === '') return fallback;
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      console.warn("Failed to parse JSON:", str);
+      return fallback;
+    }
+  };
+
   const fetchDataFromServer = async () => {
       if(!APPS_SCRIPT_URL) return;
       setIsSyncing(true);
@@ -98,24 +110,50 @@ const App = () => {
           if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
           const text = await res.text();
           
+          if (!text || text.trim() === '') throw new Error("Empty Response from Server");
           if (text.trim().startsWith('<')) throw new Error("Invalid Server Response (HTML)");
 
           let json;
-          try { json = JSON.parse(text); } catch (e) { throw new Error("JSON Parse Failed"); }
+          try { json = JSON.parse(text); } catch (e) { throw new Error("JSON Parse Failed: " + e.message); }
 
           if(json.status === 'success') {
               if(json.data.Students?.length > 0) setStudents(json.data.Students);
               if(json.data.Questions?.length > 0) setQuestions(json.data.Questions);
-              if(json.data.Packets?.length > 0) setPackets(json.data.Packets);
-              if(json.data.Exams?.length > 0) setExams(json.data.Exams);
-              if(json.data.Results?.length > 0) setExamResults(json.data.Results); 
+              
+              // PARSING LOGIC: Convert stringified JSON back to objects when reading from Spreadsheet
+              if(json.data.Packets?.length > 0) {
+                  const parsedPackets = json.data.Packets.map((p: any) => ({
+                      ...p,
+                      questionTypes: safeJsonParse(p.questionTypes, {})
+                  }));
+                  setPackets(parsedPackets);
+              }
+
+              if(json.data.Exams?.length > 0) {
+                  const parsedExams = json.data.Exams.map((e: any) => ({
+                      ...e,
+                      classTarget: safeJsonParse(e.classTarget, []),
+                      questions: safeJsonParse(e.questions, []),
+                      // Ensure boolean is boolean (Sheets might send "TRUE" string)
+                      isActive: String(e.isActive).toUpperCase() === 'TRUE'
+                  }));
+                  setExams(parsedExams);
+              }
+
+              if(json.data.Results?.length > 0) {
+                  const parsedResults = json.data.Results.map((r: any) => ({
+                      ...r,
+                      answers: safeJsonParse(r.answers, {})
+                  }));
+                  setExamResults(parsedResults);
+              }
               
               if(json.data.Settings && Object.keys(json.data.Settings).length > 0) {
                   setSchoolSettings(prev => ({ ...prev, ...json.data.Settings }));
               }
               
               setIsConnected(true);
-              console.log("Sync Read Success:", json.data);
+              console.log("Sync Read Success");
           }
       } catch (err: any) {
           console.error("Failed to connect to server:", err);
@@ -132,14 +170,26 @@ const App = () => {
       setIsSyncing(true);
       setSyncError('');
 
+      // SERIALIZATION LOGIC: Stringify nested objects so they fit into Spreadsheet cells
       const payload = {
           action: 'write',
           data: {
               Students: stateRef.current.students,
               Questions: stateRef.current.questions,
-              Packets: stateRef.current.packets,
-              Exams: stateRef.current.exams,
-              Results: stateRef.current.examResults, 
+              Packets: stateRef.current.packets.map(p => ({
+                  ...p,
+                  questionTypes: JSON.stringify(p.questionTypes || {})
+              })),
+              Exams: stateRef.current.exams.map(e => ({
+                  ...e,
+                  classTarget: JSON.stringify(e.classTarget || []),
+                  questions: JSON.stringify(e.questions || []),
+                  isActive: e.isActive // Boolean usually works, usually converts to TRUE/FALSE in sheets
+              })),
+              Results: stateRef.current.examResults.map(r => ({
+                  ...r,
+                  answers: JSON.stringify(r.answers || {})
+              })), 
               Settings: stateRef.current.schoolSettings 
           }
       };

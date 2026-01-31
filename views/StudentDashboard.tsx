@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Student, Exam, Question, QuestionType, QuestionCategory, ExamResult } from '../types';
-import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock, Square, Calendar, Archive } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock, Square, Calendar, Archive, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface StudentDashboardProps {
   student: Student;
@@ -38,6 +38,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   // UI State
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const navScrollRef = useRef<HTMLDivElement>(null);
+  const questionContainerRef = useRef<HTMLDivElement>(null); // Ref for scrolling question content
 
   // Filter exams: Show ALL exams for the student's class
   // FIX: Case insensitive and whitespace insensitive matching for class names
@@ -88,6 +89,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
             const scrollLeft = activeBtn.offsetLeft - navScrollRef.current.offsetLeft - (navScrollRef.current.clientWidth / 2) + (activeBtn.clientWidth / 2);
             navScrollRef.current.scrollTo({ left: scrollLeft, behavior: 'smooth' });
         }
+    }
+    // Auto scroll to top when question changes
+    if (activeExam && questionContainerRef.current) {
+        questionContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [currentQuestionIndex, activeExam]);
 
@@ -244,6 +249,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
   const handleFinishClick = () => {
       setShowFinishConfirm(true);
+  };
+
+  // SCROLL HELPER
+  const handleScroll = (direction: 'up' | 'down') => {
+    if (questionContainerRef.current) {
+        const scrollAmount = 250;
+        questionContainerRef.current.scrollBy({
+            top: direction === 'up' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
+    }
   };
 
   const handleSubmitExam = (forceDisqualify = false) => {
@@ -807,8 +823,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
         <div className="flex-1 flex overflow-hidden relative z-10">
           {/* LEFT SIDE: Question + Bottom Buttons */}
-          <div className="flex-1 flex flex-col min-w-0">
-              <div className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 flex flex-col min-w-0 relative group/scroll">
+              
+              {/* --- SCROLL HELPER BUTTONS (Laptop Mode) --- */}
+              <div className="absolute right-4 bottom-24 z-40 hidden md:flex flex-col gap-3 opacity-30 hover:opacity-100 group-hover/scroll:opacity-100 transition-opacity duration-300">
+                  <button onClick={() => handleScroll('up')} className="p-3 bg-slate-900/90 border border-slate-600 text-slate-300 rounded-full hover:bg-yellow-500 hover:text-black hover:border-yellow-500 shadow-lg backdrop-blur-sm transition-all transform hover:scale-110">
+                      <ChevronUp size={20} strokeWidth={3} />
+                  </button>
+                  <button onClick={() => handleScroll('down')} className="p-3 bg-slate-900/90 border border-slate-600 text-slate-300 rounded-full hover:bg-yellow-500 hover:text-black hover:border-yellow-500 shadow-lg backdrop-blur-sm transition-all transform hover:scale-110">
+                      <ChevronDown size={20} strokeWidth={3} />
+                  </button>
+              </div>
+
+              <div ref={questionContainerRef} className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
                   <div className="bg-slate-900/80 backdrop-blur-md p-6 md:p-10 rounded-none border-t-2 border-yellow-500 shadow-2xl min-h-[400px] flex flex-col relative">
                     <div className="flex justify-between items-start mb-8 border-b border-slate-700 pb-4">
