@@ -61,6 +61,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   }, [examResults, student.id]);
 
   // --- SPLIT EXAMS INTO ACTIVE & PAST ---
+  // UPDATED LOGIC: Exams stay in "Active Missions" until they expire (scheduleEnd passed), even if finished.
   const { activeMissions, pastMissions } = useMemo(() => {
       const now = new Date();
       const active: Exam[] = [];
@@ -68,10 +69,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
 
       studentExams.forEach(exam => {
           const end = new Date(exam.scheduledEnd);
-          const isDone = myHistory.some(h => h.examId === exam.id);
           const isEnded = now > end;
 
-          if (isDone || isEnded) {
+          if (isEnded) {
               past.push(exam);
           } else {
               active.push(exam);
@@ -79,7 +79,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       });
 
       return { activeMissions: active, pastMissions: past };
-  }, [studentExams, myHistory]);
+  }, [studentExams]);
 
   useEffect(() => {
     if (activeExam && navScrollRef.current) {
@@ -477,8 +477,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       const isEnded = now > end;
       const isDone = myHistory.some(h => h.examId === exam.id); 
 
+      // If finished, show score (if available) or completion status
+      const score = isDone ? myHistory.find(h => h.examId === exam.id)?.score : 0;
+
       return (
-          <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid && !isDone ? 'hover:border-yellow-500' : 'opacity-75 grayscale'}`}>
+          <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid && !isDone ? 'hover:border-yellow-500' : ''} ${isDone ? 'border-emerald-900' : ''} ${isEnded ? 'opacity-70 grayscale' : ''}`}>
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none"></div>
               <div className="p-5">
                   <div className="flex justify-between items-start mb-3">
@@ -497,7 +500,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                       <span className="flex items-center gap-1"><Clock size={12}/> {exam.durationMinutes}m</span>
                   </div>
                   {isDone ? (
-                      <button disabled className="w-full py-3 bg-emerald-900/30 text-emerald-500 font-black uppercase tracking-widest text-xs rounded border border-emerald-900/50 cursor-default">Mission Accomplished</button>
+                      <div className="w-full py-3 bg-emerald-900/20 text-emerald-500 font-black uppercase tracking-widest text-xs rounded border border-emerald-900/50 flex flex-col items-center justify-center gap-1">
+                          <span className="flex items-center gap-1"><Check size={14}/> Mission Accomplished</span>
+                          <span className="text-[10px] opacity-70">Score: {Math.round(score || 0)}</span>
+                      </div>
                   ) : isTimeValid ? (
                       <button onClick={() => handleStartExam(exam)} className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-black font-black uppercase tracking-widest text-xs rounded transition-all active:scale-95 shadow-md flex items-center justify-center gap-2">Start Mission <ChevronRight size={14}/></button>
                   ) : (
