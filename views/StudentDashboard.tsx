@@ -449,6 +449,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   const renderQuestionNavGrid = () => (
      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
       {shuffledQuestions.map((q, idx) => {
+          if (!q) return null; // Safe guard for undefined questions
           const hasAns = answers[q.id] !== undefined;
           const isMarkedDoubt = doubts.has(q.id);
           let btnClass = 'bg-slate-800/50 text-slate-500 border border-slate-700'; 
@@ -656,6 +657,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   // 2. ACTIVE EXAM INTERFACE
   if (activeExam) {
     const currentQuestion = shuffledQuestions[currentQuestionIndex];
+    
+    // --- SAFEGUARD for undefined question (Fix for "Cannot read properties of undefined (reading 'id')") ---
+    if (!currentQuestion) {
+        return (
+            <div className="h-[100dvh] flex flex-col items-center justify-center bg-slate-950 text-white p-4 text-center">
+                <AlertCircle size={48} className="text-red-500 mb-4" />
+                <h2 className="text-xl font-bold mb-2">Terjadi Kesalahan Data Soal</h2>
+                <p className="text-slate-400 mb-6">Soal tidak ditemukan atau data korup. Silakan hubungi pengawas.</p>
+                <button 
+                    onClick={() => setActiveExam(null)} 
+                    className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded font-bold transition-colors"
+                >
+                    Kembali ke Lobby
+                </button>
+            </div>
+        );
+    }
+
     const isDoubt = doubts.has(currentQuestion.id);
 
     return (
@@ -763,6 +782,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
         <div className="lg:hidden w-full bg-slate-900 border-b border-white/10 z-10 flex items-center">
             <div ref={navScrollRef} className="flex-1 flex overflow-x-auto gap-2 p-2 custom-scrollbar scroll-smooth snap-x">
               {shuffledQuestions.map((q, idx) => {
+                 if (!q) return null; // Safe guard for undefined questions
                  const hasAns = answers[q.id] !== undefined;
                  const isMarkedDoubt = doubts.has(q.id);
                  const isActive = idx === currentQuestionIndex;

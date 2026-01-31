@@ -87,16 +87,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- MEMOIZED FILTERS (ROLE BASED) ---
   const visiblePackets = useMemo(() => {
-    if (userRole === Role.ADMIN) return packets;
-    if (userRole === Role.TEACHER_LITERASI) return packets.filter(p => p.category === QuestionCategory.LITERASI);
-    if (userRole === Role.TEACHER_NUMERASI) return packets.filter(p => p.category === QuestionCategory.NUMERASI);
+    const safePackets = packets || [];
+    if (userRole === Role.ADMIN) return safePackets;
+    if (userRole === Role.TEACHER_LITERASI) return safePackets.filter(p => p?.category === QuestionCategory.LITERASI);
+    if (userRole === Role.TEACHER_NUMERASI) return safePackets.filter(p => p?.category === QuestionCategory.NUMERASI);
     return [];
   }, [packets, userRole]);
 
   const visibleExams = useMemo(() => {
-     if (userRole === Role.ADMIN) return exams;
-     const visiblePacketIds = visiblePackets.map(p => p.id);
-     return exams.filter(e => visiblePacketIds.includes(e.packetId));
+     if (userRole === Role.ADMIN) return exams || [];
+     const visiblePacketIds = (visiblePackets || []).map(p => p?.id).filter(Boolean);
+     return (exams || []).filter(e => e && visiblePacketIds.includes(e.packetId));
   }, [exams, visiblePackets, userRole]);
 
   useEffect(() => {
@@ -425,7 +426,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDownloadAnalysisExcel = () => {
       if(!selectedExamForAnalysis) return;
-      const stats = selectedExamForAnalysis.questions.map((q, idx) => {
+      const questionsList = selectedExamForAnalysis.questions || [];
+      const stats = questionsList.map((q, idx) => {
           const a = getItemAnalysis(q.id, q);
           return { "No": idx+1, "Pertanyaan": q.text, "Benar": a.correctCount, "Total": a.totalAttempts, "Persen": a.correctRate.toFixed(0)+'%', "Dist_A": a.answerDist[0], "Dist_B": a.answerDist[1], "Dist_C": a.answerDist[2], "Dist_D": a.answerDist[3] };
       });
@@ -506,7 +508,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
                        <div className="mb-4 flex justify-end"><button onClick={handleDownloadAnalysisExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button></div>
                        {selectedExamForAnalysis ? (
-                           <div className="grid grid-cols-1 gap-4">{selectedExamForAnalysis.questions.map((q, idx) => { const stats = getItemAnalysis(q.id, q); return (<div key={q.id} className="bg-slate-900 border border-slate-800 p-4 rounded"><div className="flex justify-between items-start mb-2"><span className="font-bold text-yellow-500 text-sm">Soal No. {idx + 1} ({q.type})</span><span className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${stats.correctRate > 70 ? 'bg-green-900 text-green-400' : stats.correctRate > 30 ? 'bg-yellow-900 text-yellow-400' : 'bg-red-900 text-red-400'}`}>{stats.correctRate > 70 ? 'Mudah' : stats.correctRate > 30 ? 'Sedang' : 'Sukar'}</span></div><p className="text-slate-300 text-sm mb-3 bg-black/20 p-2 rounded">{q.text}</p><div className="flex items-center gap-4 text-xs mb-4"><div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-red-500 to-green-500" style={{ width: `${stats.correctRate}%` }}></div></div><span className="font-mono text-white">{stats.correctRate.toFixed(0)}% Benar ({stats.correctCount}/{stats.totalAttempts})</span></div></div>); })}</div>
+                           <div className="grid grid-cols-1 gap-4">{(selectedExamForAnalysis.questions || []).map((q, idx) => { const stats = getItemAnalysis(q.id, q); return (<div key={q.id} className="bg-slate-900 border border-slate-800 p-4 rounded"><div className="flex justify-between items-start mb-2"><span className="font-bold text-yellow-500 text-sm">Soal No. {idx + 1} ({q.type})</span><span className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${stats.correctRate > 70 ? 'bg-green-900 text-green-400' : stats.correctRate > 30 ? 'bg-yellow-900 text-yellow-400' : 'bg-red-900 text-red-400'}`}>{stats.correctRate > 70 ? 'Mudah' : stats.correctRate > 30 ? 'Sedang' : 'Sukar'}</span></div><p className="text-slate-300 text-sm mb-3 bg-black/20 p-2 rounded">{q.text}</p><div className="flex items-center gap-4 text-xs mb-4"><div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-red-500 to-green-500" style={{ width: `${stats.correctRate}%` }}></div></div><span className="font-mono text-white">{stats.correctRate.toFixed(0)}% Benar ({stats.correctCount}/{stats.totalAttempts})</span></div></div>); })}</div>
                        ) : <p className="text-slate-500">Pilih ujian untuk melihat data.</p>}
                    </div>
                )}
