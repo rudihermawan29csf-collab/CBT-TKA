@@ -117,29 +117,72 @@ const App = () => {
           try { json = JSON.parse(text); } catch (e) { throw new Error("JSON Parse Failed: " + e.message); }
 
           if(json.status === 'success') {
+              let loadedQuestions: Question[] = [];
+              let loadedPackets: QuestionPacket[] = [];
+
+              // 1. Load Students
               if(json.data.Students?.length > 0) setStudents(json.data.Students);
-              if(json.data.Questions?.length > 0) setQuestions(json.data.Questions);
               
-              // PARSING LOGIC: Convert stringified JSON back to objects when reading from Spreadsheet
+              // 2. Load Questions
+              if(json.data.Questions?.length > 0) {
+                  loadedQuestions = json.data.Questions.map((q: any) => ({
+                      ...q,
+                      options: safeJsonParse(q.options, []),
+                      correctAnswerIndices: safeJsonParse(q.correctAnswerIndices, []),
+                      matchingPairs: safeJsonParse(q.matchingPairs, [])
+                  }));
+                  setQuestions(loadedQuestions);
+              }
+              
+              // 3. Load Packets
               if(json.data.Packets?.length > 0) {
-                  const parsedPackets = json.data.Packets.map((p: any) => ({
+                  loadedPackets = json.data.Packets.map((p: any) => ({
                       ...p,
                       questionTypes: safeJsonParse(p.questionTypes, {})
                   }));
-                  setPackets(parsedPackets);
+                  setPackets(loadedPackets);
               }
 
+              // 4. Load Exams (AND HYDRATE QUESTIONS)
               if(json.data.Exams?.length > 0) {
-                  const parsedExams = json.data.Exams.map((e: any) => ({
-                      ...e,
-                      classTarget: safeJsonParse(e.classTarget, []),
-                      questions: safeJsonParse(e.questions, []),
-                      // Ensure boolean is boolean (Sheets might send "TRUE" string)
-                      isActive: String(e.isActive).toUpperCase() === 'TRUE'
-                  }));
+                  const parsedExams = json.data.Exams.map((e: any) => {
+                      // Parse boolean safely
+                      let isActiveBool = e.isActive;
+                      if (typeof e.isActive === 'string') {
+                          isActiveBool = e.isActive.toLowerCase() === 'true';
+                      }
+
+                      // CRITICAL: Re-construct questions based on packetId
+                      // This solves the issue of the 'questions' column being empty in the spreadsheet
+                      let examQuestions: Question[] = [];
+                      if (e.packetId && loadedQuestions.length > 0) {
+                          // Find packet to get totalQuestions limit
+                          const relatedPacket = loadedPackets.find(p => p.id === e.packetId);
+                          const limit = relatedPacket ? relatedPacket.totalQuestions : 999;
+
+                          // Filter from master list
+                          examQuestions = loadedQuestions
+                              .filter(q => q.packetId === e.packetId && (q.number || 0) <= limit)
+                              .sort((a, b) => (a.number || 0) - (b.number || 0));
+                      }
+
+                      // If hydration failed (maybe questions not loaded yet?), fallback to parsed questions from sheet
+                      // But priority is the master list hydration.
+                      if (examQuestions.length === 0) {
+                           examQuestions = safeJsonParse(e.questions, []);
+                      }
+
+                      return {
+                          ...e,
+                          classTarget: safeJsonParse(e.classTarget, []),
+                          questions: examQuestions,
+                          isActive: isActiveBool
+                      };
+                  });
                   setExams(parsedExams);
               }
 
+              // 5. Load Results
               if(json.data.Results?.length > 0) {
                   const parsedResults = json.data.Results.map((r: any) => ({
                       ...r,
@@ -148,6 +191,7 @@ const App = () => {
                   setExamResults(parsedResults);
               }
               
+              // 6. Load Settings
               if(json.data.Settings && Object.keys(json.data.Settings).length > 0) {
                   setSchoolSettings(prev => ({ ...prev, ...json.data.Settings }));
               }
@@ -175,7 +219,12 @@ const App = () => {
           action: 'write',
           data: {
               Students: stateRef.current.students,
-              Questions: stateRef.current.questions,
+              Questions: stateRef.current.questions.map(q => ({
+                  ...q,
+                  options: JSON.stringify(q.options || []),
+                  correctAnswerIndices: JSON.stringify(q.correctAnswerIndices || []),
+                  matchingPairs: JSON.stringify(q.matchingPairs || [])
+              })),
               Packets: stateRef.current.packets.map(p => ({
                   ...p,
                   questionTypes: JSON.stringify(p.questionTypes || {})
@@ -183,8 +232,10 @@ const App = () => {
               Exams: stateRef.current.exams.map(e => ({
                   ...e,
                   classTarget: JSON.stringify(e.classTarget || []),
-                  questions: JSON.stringify(e.questions || []),
-                  isActive: e.isActive // Boolean usually works, usually converts to TRUE/FALSE in sheets
+                  // We send empty array for questions to save space in Sheet. 
+                  // The App will re-hydrate them based on packetId on load.
+                  questions: "[]", 
+                  isActive: e.isActive 
               })),
               Results: stateRef.current.examResults.map(r => ({
                   ...r,
