@@ -61,17 +61,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
   }, [examResults, student.id]);
 
   // --- SPLIT EXAMS INTO ACTIVE & PAST ---
-  // UPDATED LOGIC: Exams stay in "Active Missions" until they expire (scheduleEnd passed), even if finished.
+  // UPDATED LOGIC (FIX): 
+  // 1. activeMissions = All exams that are NOT DONE yet. (Even if time expired, show them in lobby so user sees 'Time Ended' instead of empty screen).
+  // 2. pastMissions = Exams that are DONE (Submitted).
   const { activeMissions, pastMissions } = useMemo(() => {
-      const now = new Date();
       const active: Exam[] = [];
       const past: Exam[] = [];
 
       studentExams.forEach(exam => {
-          const end = new Date(exam.scheduledEnd);
-          const isEnded = now > end;
+          const isDone = myHistory.some(h => h.examId === exam.id);
 
-          if (isEnded) {
+          if (isDone) {
               past.push(exam);
           } else {
               active.push(exam);
@@ -79,7 +79,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       });
 
       return { activeMissions: active, pastMissions: past };
-  }, [studentExams]);
+  }, [studentExams, myHistory]);
 
   useEffect(() => {
     if (activeExam && navScrollRef.current) {
@@ -481,14 +481,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
       const score = isDone ? myHistory.find(h => h.examId === exam.id)?.score : 0;
 
       return (
-          <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid && !isDone ? 'hover:border-yellow-500' : ''} ${isDone ? 'border-emerald-900' : ''} ${isEnded ? 'opacity-70 grayscale' : ''}`}>
+          <div key={exam.id} className={`group relative bg-slate-900 border border-slate-700 transition-all duration-300 rounded-xl overflow-hidden shadow-lg ${isTimeValid && !isDone ? 'hover:border-yellow-500' : ''} ${isDone ? 'border-emerald-900' : ''} ${isEnded && !isDone ? 'opacity-70 grayscale border-red-900' : ''}`}>
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none"></div>
               <div className="p-5">
                   <div className="flex justify-between items-start mb-3">
                       {isDone ? (
                           <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1"><Check size={10}/> Completed</span>
                       ) : (
-                          <span className="bg-blue-900/40 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded">Ranked</span>
+                          <span className={`bg-blue-900/40 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${isEnded ? 'bg-red-900/40 text-red-400 border-red-500/30' : ''}`}>
+                              {isEnded ? 'Expired' : 'Ranked'}
+                          </span>
                       )}
                       <Clock size={14} className="text-slate-500"/>
                   </div>
@@ -507,7 +509,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                   ) : isTimeValid ? (
                       <button onClick={() => handleStartExam(exam)} className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-black font-black uppercase tracking-widest text-xs rounded transition-all active:scale-95 shadow-md flex items-center justify-center gap-2">Start Mission <ChevronRight size={14}/></button>
                   ) : (
-                      <button disabled className="w-full py-3 bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs rounded flex items-center justify-center gap-2 cursor-not-allowed">{isEnded ? 'Mission Ended' : 'Coming Soon'}</button>
+                      <button disabled className="w-full py-3 bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs rounded flex items-center justify-center gap-2 cursor-not-allowed border border-slate-700">
+                          {isEnded ? (
+                              <span className="flex items-center gap-2 text-red-500"><XCircle size={14}/> Mission Ended</span>
+                          ) : 'Coming Soon'}
+                      </button>
                   )}
               </div>
           </div>
@@ -929,7 +935,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                     <div className="relative flex items-center py-8">
                                         <div className="flex-grow border-t border-slate-700"></div>
                                         <span className="flex-shrink-0 mx-4 text-slate-500 text-xs uppercase font-bold tracking-widest flex items-center gap-2">
-                                            <Archive size={14}/> Misi Selesai / Berakhir
+                                            <Archive size={14}/> Misi Selesai
                                         </span>
                                         <div className="flex-grow border-t border-slate-700"></div>
                                     </div>
