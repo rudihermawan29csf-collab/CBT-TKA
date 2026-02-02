@@ -69,6 +69,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- Exam Management State ---
   const [newExamTitle, setNewExamTitle] = useState('');
+  const [newExamCategory, setNewExamCategory] = useState<QuestionCategory>(QuestionCategory.LITERASI); // NEW: Category Filter for Exam Creation
   const [newExamPacketId, setNewExamPacketId] = useState('');
   const [newExamDuration, setNewExamDuration] = useState(60);
   const [newExamClasses, setNewExamClasses] = useState<string[]>([]);
@@ -78,7 +79,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- MONITORING STATE ---
   const [selectedExamForMonitor, setSelectedExamForMonitor] = useState<string>('');
   const [monitoringClassFilter, setMonitoringClassFilter] = useState<string>('');
-  const [monitoringStatusFilter, setMonitoringStatusFilter] = useState<'all' | 'finished' | 'unfinished'>('all');
+  const [monitoringStatusFilter, setMonitoringStatusFilter] = useState<'all' | 'finished' | 'unfinished' | 'suspicious'>('all');
 
   // --- Analysis State ---
   const [analysisSubTab, setAnalysisSubTab] = useState<'item' | 'recap' | 'missing'>('item');
@@ -108,8 +109,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const selectedExamForAnalysis = useMemo(() => exams.find(e => e.id === selectedExamIdForAnalysis), [exams, selectedExamIdForAnalysis]);
 
   useEffect(() => {
-      if (userRole === Role.TEACHER_LITERASI) setNewPacketCategory(QuestionCategory.LITERASI);
-      else if (userRole === Role.TEACHER_NUMERASI) setNewPacketCategory(QuestionCategory.NUMERASI);
+      if (userRole === Role.TEACHER_LITERASI) {
+          setNewPacketCategory(QuestionCategory.LITERASI);
+          setNewExamCategory(QuestionCategory.LITERASI);
+      }
+      else if (userRole === Role.TEACHER_NUMERASI) {
+          setNewPacketCategory(QuestionCategory.NUMERASI);
+          setNewExamCategory(QuestionCategory.NUMERASI);
+      }
   }, [userRole]);
 
   // --- HELPER FUNCTIONS ---
@@ -632,8 +639,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }).filter(item => {
           if (monitoringStatusFilter === 'finished') return !!item.result;
           if (monitoringStatusFilter === 'unfinished') return !item.result;
+          if (monitoringStatusFilter === 'suspicious') return item.result && (item.result.isDisqualified || (item.result.violationCount || 0) > 0);
           return true;
       }).sort((a, b) => {
+          // 0. Sort by Suspicious Activity (Disqualified/Violations FIRST)
+          const aSus = a.result?.isDisqualified || (a.result?.violationCount || 0) > 0;
+          const bSus = b.result?.isDisqualified || (b.result?.violationCount || 0) > 0;
+          if (aSus && !bSus) return -1;
+          if (!aSus && bSus) return 1;
+
           // 1. Sort by Status (Finished first)
           const aFinished = !!a.result;
           const bFinished = !!b.result;
@@ -683,6 +697,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Status</label>
                       <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={monitoringStatusFilter} onChange={e => setMonitoringStatusFilter(e.target.value as any)}>
                           <option value="all">Semua Status</option>
+                          <option value="suspicious">Terindikasi Curang</option>
                           <option value="finished">Sudah Selesai</option>
                           <option value="unfinished">Belum Mengerjakan</option>
                       </select>
@@ -991,7 +1006,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="bg-slate-900 p-6 border border-white/10 h-fit">
                       <h3 className="font-bold text-white mb-4">Buat Jadwal</h3>
                       <input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama Ujian" value={newExamTitle} onChange={e=>setNewExamTitle(e.target.value)}/>
-                      <select className="w-full bg-black p-2 mb-2 text-white border border-slate-700" value={newExamPacketId} onChange={e=>setNewExamPacketId(e.target.value)}><option value="">Pilih Paket</option>{visiblePackets.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                      
+                      {/* NEW: Category Selector */}
+                      <div className="mb-2">
+                        <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block">Kategori</label>
+                        <select 
+                            className="w-full bg-black p-2 text-white border border-slate-700 text-sm" 
+                            value={newExamCategory} 
+                            onChange={e => {
+                                setNewExamCategory(e.target.value as QuestionCategory);
+                                setNewExamPacketId(''); // Reset packet selection when category changes
+                            }}
+                        >
+                            <option value={QuestionCategory.LITERASI}>Literasi</option>
+                            <option value={QuestionCategory.NUMERASI}>Numerasi</option>
+                        </select>
+                      </div>
+
+                      <div className="mb-2">
+                        <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block">Pilih Paket Soal</label>
+                        <select 
+                            className="w-full bg-black p-2 text-white border border-slate-700 text-sm" 
+                            value={newExamPacketId} 
+                            onChange={e=>setNewExamPacketId(e.target.value)}
+                        >
+                            <option value="">-- Pilih Paket {newExamCategory} --</option>
+                            {visiblePackets
+                                .filter(p => p.category === newExamCategory) // Apply filter based on selected category
+                                .map(p=><option key={p.id} value={p.id}>{p.name} ({p.totalQuestions} Soal)</option>)
+                            }
+                        </select>
+                      </div>
+
                       <div className="flex gap-2 mb-2"><input type="datetime-local" className="bg-black text-white text-xs p-1 w-1/2" value={newExamStart} onChange={e=>setNewExamStart(e.target.value)}/><input type="datetime-local" className="bg-black text-white text-xs p-1 w-1/2" value={newExamEnd} onChange={e=>setNewExamEnd(e.target.value)}/></div>
                       <div className="mb-2"><input type="number" className="bg-black text-white text-xs p-2 w-full border border-slate-700" placeholder="Durasi (Menit)" value={newExamDuration} onChange={e=>setNewExamDuration(parseInt(e.target.value))}/></div>
                       <div className="grid grid-cols-3 gap-2 mb-4">{CLASS_LIST.map(c=><button key={c} onClick={()=>{if(newExamClasses.includes(c))setNewExamClasses(newExamClasses.filter(x=>x!==c));else setNewExamClasses([...newExamClasses,c])}} className={`text-[10px] border p-1 ${newExamClasses.includes(c)?'bg-yellow-600 text-black':'text-slate-400'}`}>{c}</button>)}</div>
