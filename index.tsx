@@ -273,13 +273,59 @@ const App = () => {
       }
   };
 
-  const handleStudentSaveResult = (result: ExamResult) => {
+  const handleStudentSaveResult = async (result: ExamResult) => {
+      // 1. Optimistic Update (UI updates immediately)
       setExamResults(prev => {
-          const next = [...prev, result];
-          stateRef.current.examResults = next;
-          return next;
+          if(prev.some(r => r.id === result.id)) return prev;
+          return [...prev, result];
       });
-      setTimeout(() => saveDataToServer(), 2000); 
+
+      setIsSyncing(true);
+      
+      try {
+          console.log("Starting reliable submit process...");
+          
+          // 2. READ: Fetch latest data from server first (critical for concurrency)
+          if(APPS_SCRIPT_URL) {
+              const res = await fetch(`${APPS_SCRIPT_URL}?action=read&t=${Date.now()}`);
+              const text = await res.text();
+              const json = JSON.parse(text);
+              
+              if(json.status === 'success') {
+                  // 3. MERGE: Get server results and append/update with current student result
+                  const serverResults = json.data.Results || [];
+                  const parsedServerResults = serverResults.map((r: any) => ({
+                      ...r,
+                      answers: safeJsonParse(r.answers, {})
+                  }));
+
+                  // Remove if this student ID + exam ID already exists (overwrite scenario) or just append
+                  // For safety, let's filter out any existing result with same ID to prevent duplicates
+                  const otherResults = parsedServerResults.filter((r: ExamResult) => r.id !== result.id);
+                  const mergedResults = [...otherResults, result];
+                  
+                  // Update stateRef so saveDataToServer uses this fresh, merged list
+                  stateRef.current.examResults = mergedResults;
+                  
+                  // OPTIONAL: Refresh other data refs to avoid overwriting Admin changes
+                  if (json.data.Students) stateRef.current.students = json.data.Students;
+                  // We do NOT update Exams/Questions here to avoid complex parsing logic bugs during student submit,
+                  // assuming Students only append Results.
+                  
+                  console.log("Merge complete. Saving...");
+              }
+          }
+
+          // 4. WRITE: Save the merged state back to server
+          await saveDataToServer();
+          
+          alert("Jawaban BERHASIL terkirim ke server! Anda boleh menutup halaman ini.");
+      } catch (e) {
+          console.error("Submission Error:", e);
+          alert("Gagal sinkronisasi otomatis. JANGAN TUTUP HALAMAN. Data tersimpan di browser, silakan coba tekan tombol Sync/Refresh nanti.");
+      } finally {
+          setIsSyncing(false);
+      }
   };
 
   const handleLogin = (e: React.FormEvent) => {
