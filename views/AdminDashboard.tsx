@@ -1,8 +1,11 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Student, Teacher, Question, QuestionType, QuestionCategory, QuestionPacket, Exam, Role, SchoolSettings, ExamResult } from '../types';
-import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX } from 'lucide-react';
+import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX, Sigma } from 'lucide-react';
 import { CLASS_LIST } from '../constants';
 import * as XLSX from 'xlsx';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 interface AdminDashboardProps {
   userRole?: Role; 
@@ -123,6 +126,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   
   // Word/HTML Cleanup Helper
   const cleanWordHtml = (html: string) => {
+    // Basic cleanup, but for Math inputs we want to preserve content mostly
+    // Just remove weird Word wrapper divs if any, but keep text content
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     return tempDiv.textContent || tempDiv.innerText || "";
@@ -807,30 +812,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                  <div className="space-y-4 flex-1">
                                      <div className="flex justify-between">
                                         <h3 className="text-white font-bold">Edit Soal {activeSlot}</h3>
-                                        <select 
-                                            className="bg-black text-white p-1 text-xs" 
-                                            value={manualType} 
-                                            onChange={e => {
-                                                const t = e.target.value as QuestionType;
-                                                setManualType(t);
-                                                // Auto-initialize defaults when switching types manually
-                                                if (t === QuestionType.MATCHING) {
-                                                    const currentOpts = [...newOptions];
-                                                    if (!currentOpts[0]) currentOpts[0] = 'Benar';
-                                                    if (!currentOpts[1]) currentOpts[1] = 'Salah';
-                                                    setNewOptions(currentOpts);
-                                                    
-                                                    // Only reset pairs if they look empty/invalid
-                                                    if (matchingPairs.length === 0 || (matchingPairs.length === 1 && !matchingPairs[0].left)) {
-                                                        setMatchingPairs([{left: '', right: currentOpts[0]}]);
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-[10px] text-slate-400 border border-slate-600 px-2 py-1 rounded bg-black flex items-center gap-1">
+                                                <Sigma size={10} className="text-yellow-500"/>
+                                                Support Math: Gunakan $...$ untuk rumus (contoh: $\sqrt{25}$, $x^2$)
+                                            </div>
+                                            <select 
+                                                className="bg-black text-white p-1 text-xs border border-slate-700" 
+                                                value={manualType} 
+                                                onChange={e => {
+                                                    const t = e.target.value as QuestionType;
+                                                    setManualType(t);
+                                                    if (t === QuestionType.MATCHING) {
+                                                        const currentOpts = [...newOptions];
+                                                        if (!currentOpts[0]) currentOpts[0] = 'Benar';
+                                                        if (!currentOpts[1]) currentOpts[1] = 'Salah';
+                                                        setNewOptions(currentOpts);
+                                                        if (matchingPairs.length === 0 || (matchingPairs.length === 1 && !matchingPairs[0].left)) {
+                                                            setMatchingPairs([{left: '', right: currentOpts[0]}]);
+                                                        }
                                                     }
-                                                }
-                                            }}
-                                        >
-                                            <option value={QuestionType.SINGLE}>Pilihan Ganda</option>
-                                            <option value={QuestionType.COMPLEX}>PG Kompleks</option>
-                                            <option value={QuestionType.MATCHING}>Menjodohkan / Benar Salah</option>
-                                        </select>
+                                                }}
+                                            >
+                                                <option value={QuestionType.SINGLE}>Pilihan Ganda</option>
+                                                <option value={QuestionType.COMPLEX}>PG Kompleks</option>
+                                                <option value={QuestionType.MATCHING}>Menjodohkan / Benar Salah</option>
+                                            </select>
+                                        </div>
                                      </div>
                                      
                                      {/* STIMULUS SECTION */}
@@ -924,8 +932,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                      <div className="mt-6 bg-slate-800/50 p-4 border border-slate-700 rounded-lg">
                                          <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Preview Tampilan Soal</p>
                                          {stimulusType === 'image' && newQuestionImage && <img src={newQuestionImage} className="max-h-32 mb-2 rounded border border-slate-600"/>}
-                                         {stimulusType === 'text' && newStimulus && <p className="text-sm text-slate-300 mb-2 italic bg-black/20 p-2 border-l-2 border-blue-500 whitespace-pre-wrap">{newStimulus}</p>}
-                                         <p className="text-white font-bold text-sm mb-4">{newQuestionText || "[Teks Pertanyaan]"}</p>
+                                         
+                                         {/* Markdown Render for Stimulus */}
+                                         {stimulusType === 'text' && newStimulus && (
+                                            <div className="text-sm text-slate-300 mb-2 italic bg-black/20 p-2 border-l-2 border-blue-500 prose prose-invert max-w-none">
+                                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newStimulus}</ReactMarkdown>
+                                            </div>
+                                         )}
+                                         
+                                         {/* Markdown Render for Question Text */}
+                                         <div className="text-white font-bold text-sm mb-4 prose prose-invert max-w-none">
+                                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newQuestionText || "[Teks Pertanyaan]"}</ReactMarkdown>
+                                         </div>
                                          
                                          {/* OPTION PREVIEW */}
                                          {manualType === QuestionType.SINGLE && (
@@ -935,7 +953,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleCorrectIndex === i ? 'border-green-500 bg-green-500 text-black' : 'border-slate-500'}`}>
                                                              {singleCorrectIndex === i && <div className="w-2 h-2 bg-black rounded-full" />}
                                                          </div>
-                                                         <span>{opt || `Opsi ${String.fromCharCode(65+i)}`}</span>
+                                                         {/* Markdown for Options */}
+                                                         <span className="flex-1">
+                                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{opt || `Opsi ${String.fromCharCode(65+i)}`}</ReactMarkdown>
+                                                         </span>
                                                      </div>
                                                  ))}
                                              </div>
@@ -947,7 +968,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${complexCorrectIndices.includes(i) ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-500'}`}>
                                                               {complexCorrectIndices.includes(i) && <Check size={10} />}
                                                          </div>
-                                                         <span>{opt || `Opsi ${i+1}`}</span>
+                                                         <span className="flex-1">
+                                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{opt || `Opsi ${i+1}`}</ReactMarkdown>
+                                                         </span>
                                                      </div>
                                                  ))}
                                              </div>
@@ -967,7 +990,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                          {matchingPairs.map((pair, i) => (
                                                              <tr key={i} className="border-b border-slate-800 last:border-0 hover:bg-white/5">
                                                                  <td className="p-2 text-center border-r border-slate-800 font-mono text-slate-500">{i+1}</td>
-                                                                 <td className="p-2 border-r border-slate-800">{pair.left || '-'}</td>
+                                                                 <td className="p-2 border-r border-slate-800">
+                                                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{pair.left || '-'}</ReactMarkdown>
+                                                                 </td>
                                                                  <td className="p-2 text-center border-r border-slate-800">
                                                                      <div className={`w-4 h-4 rounded-full border mx-auto flex items-center justify-center ${pair.right === newOptions[0] ? 'bg-green-500 border-green-400' : 'border-slate-600'}`}>
                                                                          {pair.right === newOptions[0] && <div className="w-2 h-2 bg-black rounded-full"/>}

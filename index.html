@@ -6,6 +6,8 @@
     <title>CBT SMPN 3 Pacet</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- KaTeX CSS for Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
     <style>
       body { 
         font-family: 'Inter', sans-serif; 
@@ -32,6 +34,12 @@
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(0,0,0,0.4);
       }
+      
+      /* Math & Markdown Styles */
+      .prose p { margin-bottom: 0.5em; }
+      .prose ul { list-style-type: disc; padding-left: 1.5em; }
+      .prose ol { list-style-type: decimal; padding-left: 1.5em; }
+      .katex { font-size: 1.1em; }
     </style>
     <script>
       // Polyfill for process.env to prevent runtime errors in browser environments
@@ -48,7 +56,10 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs",
     "mammoth": "https://esm.sh/mammoth@1.6.0",
     "jspdf": "https://esm.sh/jspdf@2.5.1",
-    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.1"
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.1",
+    "react-markdown": "https://esm.sh/react-markdown@9.0.1",
+    "rehype-katex": "https://esm.sh/rehype-katex@7.0.0",
+    "remark-math": "https://esm.sh/remark-math@6.0.0"
   }
 }
 </script>

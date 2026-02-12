@@ -16,7 +16,10 @@
     "xlsx": "latest",
     "mammoth": "1.6.0",
     "jspdf": "2.5.1",
-    "jspdf-autotable": "3.8.1"
+    "jspdf-autotable": "3.8.1",
+    "react-markdown": "9.0.1",
+    "rehype-katex": "7.0.0",
+    "remark-math": "6.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Student, Exam, Question, QuestionType, QuestionCategory, ExamResult } from '../types';
 import { Clock, CheckCircle, AlertCircle, FileText, ChevronRight, ChevronLeft, Save, HelpCircle, Layout, Check, Crosshair, Map, Shield, Trophy, BarChart2, Target, XCircle, Grid, X, Menu, LogOut, Home, Flag, ImageIcon, User, AlertTriangle, Zap, Heart, Shield as ShieldIcon, AlertOctagon, Lock, Square, Calendar, Archive, ChevronUp, ChevronDown } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 interface StudentDashboardProps {
   student: Student;
@@ -359,7 +362,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
               <span className="transform skew-x-12">{String.fromCharCode(65 + idx)}</span>
             </div>
             <span className={`text-lg font-medium leading-relaxed ${isSelected ? 'text-yellow-400' : 'text-slate-300 group-hover:text-white'}`}>
-                {option}
+                {/* Math Render for Options */}
+                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{option}</ReactMarkdown>
             </span>
             {isSelected && <div className="absolute right-0 top-0 bottom-0 w-2 bg-gradient-to-l from-yellow-500/50 to-transparent"></div>}
           </button>
@@ -398,7 +402,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                         {isSelected ? <Check size={20} strokeWidth={4} /> : null}
                     </div>
                     <span className={`text-lg font-medium leading-relaxed ${isSelected ? 'text-blue-200' : 'text-slate-300 group-hover:text-white'}`}>
-                        {option}
+                        {/* Math Render for Options */}
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{option}</ReactMarkdown>
                     </span>
                     </button>
                 );
@@ -430,7 +435,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                         {q.matchingPairs?.map((pair, idx) => (
                             <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
                                 <td className="px-4 py-3 text-center font-mono text-slate-500 sticky left-0 bg-slate-900 shadow-[1px_0_0_rgba(255,255,255,0.1)] z-10">{idx + 1}</td>
-                                <td className="px-4 py-3 font-medium text-slate-200 min-w-[200px] text-lg">{pair.left}</td>
+                                <td className="px-4 py-3 font-medium text-slate-200 min-w-[200px] text-lg">
+                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{pair.left}</ReactMarkdown>
+                                </td>
                                 <td className="px-4 py-3 text-center bg-emerald-900/10">
                                     <label className="flex items-center justify-center w-full h-full cursor-pointer min-h-[40px]">
                                         <input 
@@ -848,7 +855,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                     {currentQuestion.stimulus && (
                        <div className="mb-8 p-6 bg-emerald-900/20 border border-emerald-500/30 rounded-sm relative">
                           <div className="absolute top-0 left-0 bg-emerald-600 text-black text-[10px] font-black px-2 py-0.5 uppercase tracking-widest">INTEL</div>
-                          <p className="text-emerald-100/90 leading-relaxed text-lg mt-2 font-medium whitespace-pre-wrap">{currentQuestion.stimulus}</p>
+                          <div className="text-emerald-100/90 leading-relaxed text-lg mt-2 font-medium whitespace-pre-wrap prose prose-invert max-w-none">
+                              {/* Math Render for Stimulus */}
+                              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{currentQuestion.stimulus}</ReactMarkdown>
+                          </div>
                        </div>
                     )}
                     {currentQuestion.image && (
@@ -860,7 +870,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                           <img src={currentQuestion.image} alt="Lampiran Soal" className="max-w-full h-auto max-h-[400px] object-contain rounded-lg shadow-lg border border-slate-600 mt-8 md:mt-0" />
                        </div>
                     )}
-                    <p className="text-lg text-white leading-relaxed mb-8 font-medium whitespace-pre-wrap">{currentQuestion.text}</p>
+                    <div className="text-lg text-white leading-relaxed mb-8 font-medium whitespace-pre-wrap prose prose-invert max-w-none">
+                        {/* Math Render for Question */}
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{currentQuestion.text}</ReactMarkdown>
+                    </div>
                     <div className="mb-6 flex-1">
                       {currentQuestion.type === QuestionType.SINGLE && renderSingleChoice(currentQuestion)}
                       {currentQuestion.type === QuestionType.COMPLEX && renderComplexChoice(currentQuestion)}
@@ -1064,10 +1077,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                                            const correctSet = new Set(q.correctAnswerIndices);
                                                            if (userSet.size === correctSet.size && [...userSet].every(x => correctSet.has(x))) isCorrect = true;
                                                        } else if (q.type === QuestionType.MATCHING) {
-                                                            // Simplified check for demo
-                                                            isCorrect = true; // Assume logic handled in score calc, here we just show status
-                                                            // Re-calculate strictly if needed, but for display we assume score reflects correctness
-                                                            // Since we don't store per-question correctness in ExamResult, we re-eval
+                                                            isCorrect = true; 
                                                             const userPairs = ans as Record<string, string>;
                                                             if (userPairs && q.matchingPairs) {
                                                                 const allCorrect = q.matchingPairs.every(pair => userPairs[pair.left] === pair.right);
@@ -1082,8 +1092,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ student, exa
                                                                <div className={`flex-none w-6 h-6 flex items-center justify-center rounded font-bold text-xs ${isCorrect ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>
                                                                    {idx + 1}
                                                                </div>
-                                                               <div className="flex-1 min-w-0">
-                                                                   <p className="text-sm text-slate-300 line-clamp-2 leading-relaxed">{q.text}</p>
+                                                               <div className="flex-1 min-w-0 prose prose-invert prose-sm">
+                                                                   {/* Math Render in History */}
+                                                                   <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'p'}}>{q.text}</ReactMarkdown>
                                                                </div>
                                                                <div className="flex-none">
                                                                    {isCorrect ? (
