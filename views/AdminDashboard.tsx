@@ -24,11 +24,12 @@ interface AdminDashboardProps {
   setSchoolSettings?: React.Dispatch<React.SetStateAction<SchoolSettings>>;
   onSyncData?: () => void;
   examResults?: ExamResult[];
+  onUploadImage?: (base64: string, filename: string) => Promise<string>;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   userRole = Role.ADMIN, students, setStudents, teachers, setTeachers, questions, setQuestions, exams = [], setExams, activeTab,
-  packets, setPackets, schoolSettings, setSchoolSettings, onSyncData, examResults = []
+  packets, setPackets, schoolSettings, setSchoolSettings, onSyncData, examResults = [], onUploadImage
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -62,7 +63,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [stimulusType, setStimulusType] = useState<'text' | 'image'>('text');
   const [newStimulus, setNewStimulus] = useState(''); 
   const [newQuestionText, setNewQuestionText] = useState('');
-  const [newQuestionImage, setNewQuestionImage] = useState(''); // Stores Base64
+  const [newQuestionImage, setNewQuestionImage] = useState(''); // Stores Base64 OR URL
+  const [isImageUploading, setIsImageUploading] = useState(false);
   
   // Options State
   const [newOptions, setNewOptions] = useState<string[]>(['', '', '', '']);
@@ -196,21 +198,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return `${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} s.d ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
   };
 
-  // Handle Image Upload (OPTIMIZED FOR GOOGLE DRIVE UPLOAD)
+  // Handle Image Upload (UPDATED TO USE IMMEDIATE SERVER UPLOAD)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
           const reader = new FileReader();
-          reader.onload = (event) => {
+          reader.onload = async (event) => {
               const img = new Image();
-              img.onload = () => {
+              img.onload = async () => {
                   const canvas = document.createElement('canvas');
                   let width = img.width;
                   let height = img.height;
                   
-                  // NEW: Increased limit to 1024px for decent quality (HD Ready)
-                  // The backend will now upload this to Drive, so we don't need to fit in a cell
-                  const MAX_SIZE = 1024; 
+                  // HD Ready size
+                  const MAX_SIZE = 1280; 
 
                   if (width > height) {
                       if (width > MAX_SIZE) {
@@ -227,15 +228,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   canvas.height = height;
                   const ctx = canvas.getContext('2d');
                   if (ctx) {
-                      // Add white background (prevents transparency issues)
                       ctx.fillStyle = "#FFFFFF";
                       ctx.fillRect(0, 0, width, height);
-                      
                       ctx.drawImage(img, 0, 0, width, height);
-                      // High Quality JPEG (0.8) for Drive storage
-                      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
                       
-                      setNewQuestionImage(dataUrl);
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                      
+                      // UPLOAD PROCESS
+                      if (onUploadImage) {
+                          setIsImageUploading(true);
+                          try {
+                              const filename = `img_${Date.now()}.jpg`;
+                              const driveUrl = await onUploadImage(dataUrl, filename);
+                              setNewQuestionImage(driveUrl);
+                              alert("Gambar berhasil diupload ke Google Drive!");
+                          } catch (error) {
+                              console.error("Upload failed", error);
+                              alert("Gagal upload ke Google Drive. Pastikan skrip server sudah diupdate.");
+                              // Fallback: Set Base64 but warn user
+                              setNewQuestionImage(dataUrl);
+                          } finally {
+                              setIsImageUploading(false);
+                          }
+                      } else {
+                          // Legacy fallback if no handler provided
+                          setNewQuestionImage(dataUrl);
+                      }
                   }
               };
               img.src = event.target?.result as string;
@@ -388,7 +406,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           qData.image = '';
       } else {
           qData.stimulus = '';
-          qData.image = newQuestionImage; // This will now use the compressed image
+          qData.image = newQuestionImage; // This will now be a URL if updated
       }
 
       // Handle Answers based on Type
@@ -436,6 +454,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const type = pkt?.questionTypes[num] || QuestionType.SINGLE;
       setManualType(type);
       setLastFocusedField(null); // Reset focus
+      setIsImageUploading(false);
       
       if (existingQ) {
           setEditingQuestionId(existingQ.id); 
@@ -960,8 +979,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                          ) : (
                                              <div className="space-y-2">
                                                  <input type="file" accept="image/*" ref={imageUploadRef} onChange={handleImageUpload} className="hidden" />
-                                                 <div className="flex gap-2">
-                                                     <button onClick={() => imageUploadRef.current?.click()} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 text-xs rounded flex items-center gap-2 border border-slate-600"><Upload size={14}/> Upload Gambar</button>
+                                                 <div className="flex gap-2 items-center">
+                                                     <button disabled={isImageUploading} onClick={() => imageUploadRef.current?.click()} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 text-xs rounded flex items-center gap-2 border border-slate-600 disabled:opacity-50">
+                                                         <Upload size={14}/> {isImageUploading ? 'Mengupload...' : 'Upload Gambar'}
+                                                     </button>
+                                                     {isImageUploading && <RefreshCw size={14} className="animate-spin text-blue-500"/>}
                                                      {newQuestionImage && <button onClick={() => setNewQuestionImage('')} className="text-red-500 text-xs">Hapus</button>}
                                                  </div>
                                                  {newQuestionImage && <img src={newQuestionImage} alt="Stimulus" className="max-h-40 object-contain border border-slate-700 bg-black/50 rounded"/>}
@@ -1203,28 +1225,4 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {visibleExams.map(e => {
                           const pkt = packets.find(p => p.id === e.packetId);
                           return (
-                              <div key={e.id} className={`bg-slate-900 border p-4 flex justify-between ${e.isActive?'border-green-500':'border-slate-700'}`}>
-                                  <div>
-                                      <h4 className="font-bold text-white text-lg">{e.title}</h4>
-                                      <div className="flex items-center gap-2 mb-1 mt-1">
-                                          <span className="bg-yellow-900 text-yellow-500 border border-yellow-700 px-2 py-0.5 text-[10px] uppercase font-bold rounded">{pkt?.name || 'Paket Tidak Dikenal'}</span>
-                                          <span className="bg-purple-900 text-purple-400 border border-purple-700 px-2 py-0.5 text-[10px] uppercase font-bold rounded">{pkt?.category || '-'}</span>
-                                      </div>
-                                      <p className="text-xs text-slate-400 mb-1">{e.classTarget.join(', ')} <span className="text-slate-600 mx-2">|</span> {e.durationMinutes} Menit</p>
-                                      <p className="text-[10px] text-slate-500 font-mono">{formatDateRange(e.scheduledStart, e.scheduledEnd)}</p>
-                                  </div>
-                                  <div className="flex gap-2 items-start">
-                                      <button onClick={()=>toggleExamStatus(e.id)} className={`text-xs px-2 py-1 ${e.isActive?'bg-red-900 text-red-400':'bg-green-900 text-green-400'}`}>{e.isActive?'STOP':'START'}</button>
-                                      <button onClick={()=>handleDeleteExam(e.id)} className="text-red-500"><Trash2 size={16}/></button>
-                                  </div>
-                              </div>
-                          );
-                      })}
-                  </div>
-              </div>
-          </div>
-      );
-  }
-
-  return null;
-};
+                              <div key={e.id} className={`bg-slate-900 border p-4 flex justify-between ${e.isActive?'border-green-500':'border-slate-700'

@@ -234,6 +234,41 @@ const App = () => {
       }
   };
 
+  // NEW: Dedicated function to upload a single image to Drive and get URL
+  // This bypasses the massive payload limit by handling images one by one
+  const uploadImageToServer = async (base64Data: string, filename: string): Promise<string> => {
+      if(!APPS_SCRIPT_URL) throw new Error("Server URL not configured");
+      
+      // Remove data:image/jpeg;base64, prefix if present for clean payload
+      const cleanBase64 = base64Data.split(',')[1] || base64Data;
+
+      const payload = {
+          action: 'upload',
+          data: {
+              image: cleanBase64,
+              name: filename
+          }
+      };
+
+      const res = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          redirect: 'follow',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error("Network response was not ok");
+      
+      const text = await res.text();
+      const json = JSON.parse(text);
+
+      if (json.status === 'success' && json.url) {
+          return json.url;
+      } else {
+          throw new Error(json.message || "Upload failed");
+      }
+  };
+
   // Function to save data
   const saveDataToServer = async () => {
       if(!APPS_SCRIPT_URL) return;
@@ -299,7 +334,7 @@ const App = () => {
           console.error("Upload failed:", err);
           setSyncError("Upload Failed");
           setIsConnected(false);
-          alert("Gagal menyimpan ke server! Periksa koneksi atau ukuran gambar mungkin terlalu besar (Maksimal payload POST).");
+          alert("Gagal menyimpan ke server! Pastikan koneksi stabil. Jika error berlanjut, hubungi admin.");
       } finally {
           setIsSyncing(false);
       }
@@ -569,10 +604,10 @@ const App = () => {
                     examResults={examResults} 
                     onSyncData={() => {
                         // FORCE UPDATE REF before sync to ensure fresh data
-                        // This fixes the issue where data might be stale if clicked immediately
                         stateRef.current = { students, questions, exams, packets, examResults, schoolSettings };
                         setTimeout(saveDataToServer, 500); 
-                    }} 
+                    }}
+                    onUploadImage={uploadImageToServer} 
                   />
                 )}
                 {session.role === Role.STUDENT && session.details && (
