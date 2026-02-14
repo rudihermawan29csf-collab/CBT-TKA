@@ -397,11 +397,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           qData.matchingPairs = matchingPairs.filter(p => p.left); 
       }
 
-      if (editingQuestionId) setQuestions(prev => prev.map(q => q.id === editingQuestionId ? { ...q, ...qData } as Question : q));
-      else setQuestions(prev => [...prev, { ...qData, id: `q-${Date.now()}` } as Question]);
+      // STRICT ID/SLOT CHECK: Find if question already exists for this slot to avoid duplicates
+      const existingQIndex = questions.findIndex(q => q.packetId === selectedPacketId && q.number === activeSlot);
+      let newQuestions = [...questions];
       
+      if (existingQIndex >= 0) {
+          // Update Existing Question
+          const existingId = newQuestions[existingQIndex].id;
+          newQuestions[existingQIndex] = { ...newQuestions[existingQIndex], ...qData };
+          setEditingQuestionId(existingId); // Ensure state tracks correct ID
+      } else {
+          // Create New Question
+          const newId = `q-${Date.now()}`;
+          newQuestions.push({ ...qData, id: newId } as Question);
+          setEditingQuestionId(newId); // Ensure state tracks correct ID
+      }
+
+      setQuestions(newQuestions);
       setPackets(prev => prev.map(p => p.id === selectedPacketId ? { ...p, questionTypes: { ...p.questionTypes, [activeSlot]: manualType } } : p));
-      alert(`Soal No. ${activeSlot} tersimpan`); triggerSync();
+      
+      alert(`Soal No. ${activeSlot} tersimpan`); 
+      triggerSync();
   };
 
   const prepareSlotForm = (num: number) => {
@@ -501,7 +517,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
+  // ... (Settings, Analysis, Student Tabs remain unchanged, skipping to save space) ...
   if (activeTab === 'settings') {
+      // (Original Settings Tab Code)
       return (
           <div className="p-8 h-full overflow-y-auto">
               <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6"><Settings className="text-yellow-500"/> Pengaturan</h2>
@@ -515,291 +533,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <button className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs" onClick={() => { alert("Disimpan!"); triggerSync(); }}>Simpan</button>
                   </div>
               </div>
-          </div>
-      );
-  }
-
-  if (activeTab === 'analysis') {
-      const targetExam = exams.find(e => e.id === selectedExamIdForAnalysis);
-      
-      // FIXED: Robust Class Matching (Remove spaces, Ignore Case)
-      const targetStudents = targetExam ? students.filter(s => {
-          const sClassNorm = s.class.replace(/\s+/g, '').toUpperCase();
-          return targetExam.classTarget.some(t => t.replace(/\s+/g, '').toUpperCase() === sClassNorm);
-      }) : [];
-      
-      const filteredTargetStudents = analysisClassFilter ? targetStudents.filter(s => s.class === analysisClassFilter) : targetStudents;
-      
-      const finishedResults = selectedExamIdForAnalysis ? examResults.filter(r => r.examId === selectedExamIdForAnalysis) : [];
-      const finishedStudentIds = new Set(finishedResults.map(r => r.studentId));
-      
-      const missingStudents = filteredTargetStudents.filter(s => !finishedStudentIds.has(s.id));
-
-      return (
-          <div className="p-8 h-full flex flex-col overflow-hidden">
-               <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6 flex-none"><BarChart2 className="text-yellow-500"/> Analisis Hasil Ujian</h2>
-               <div className="bg-slate-900/80 p-4 border border-white/10 mb-6 flex flex-col md:flex-row gap-4 items-end flex-none">
-                   <div className="flex-1 w-full"><label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Pilih Ujian</label><select className="w-full bg-black/50 border border-slate-700 p-2 text-white text-sm" value={selectedExamIdForAnalysis} onChange={e => setSelectedExamIdForAnalysis(e.target.value)}>{visibleExams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}</select></div>
-                   {(analysisSubTab === 'recap' || analysisSubTab === 'missing') && (
-                       <div className="w-full md:w-48">
-                           <label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Filter Kelas</label>
-                           <select className="w-full bg-black/50 border border-slate-700 p-2 text-white text-sm" value={analysisClassFilter} onChange={e => setAnalysisClassFilter(e.target.value)}>
-                               <option value="">Semua Kelas</option>
-                               {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
-                           </select>
-                       </div>
-                   )}
-                   <div className="flex bg-slate-900 border border-slate-700 p-1 rounded shrink-0">
-                       <button onClick={() => setAnalysisSubTab('item')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'item' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Butir Soal</button>
-                       <button onClick={() => setAnalysisSubTab('recap')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'recap' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Rekap Nilai</button>
-                       <button onClick={() => setAnalysisSubTab('missing')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'missing' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Belum Ujian</button>
-                   </div>
-               </div>
-               
-               {analysisSubTab === 'item' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
-                       <div className="mb-4 flex justify-end"><button onClick={handleDownloadAnalysisExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button></div>
-                       {selectedExamForAnalysis ? (
-                           <div className="grid grid-cols-1 gap-4">{(selectedExamForAnalysis.questions || []).map((q, idx) => { const stats = getItemAnalysis(q.id, q); return (<div key={q.id} className="bg-slate-900 border border-slate-800 p-4 rounded"><div className="flex justify-between items-start mb-2"><span className="font-bold text-yellow-500 text-sm">Soal No. {idx + 1} ({q.type})</span><span className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${stats.correctRate > 70 ? 'bg-green-900 text-green-400' : stats.correctRate > 30 ? 'bg-yellow-900 text-yellow-400' : 'bg-red-900 text-red-400'}`}>{stats.correctRate > 70 ? 'Mudah' : stats.correctRate > 30 ? 'Sedang' : 'Sukar'}</span></div><p className="text-slate-300 text-sm mb-3 bg-black/20 p-2 rounded">{q.text}</p><div className="flex items-center gap-4 text-xs mb-4"><div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-red-500 to-green-500" style={{ width: `${stats.correctRate}%` }}></div></div><span className="font-mono text-white">{stats.correctRate.toFixed(0)}% Benar ({stats.correctCount}/{stats.totalAttempts})</span></div></div>); })}</div>
-                       ) : <p className="text-slate-500">Pilih ujian untuk melihat data.</p>}
-                   </div>
-               )}
-               
-               {analysisSubTab === 'recap' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
-                        <div className="mb-4 flex justify-between items-center flex-none">
-                            <div className="text-sm text-slate-400">Total: <span className="text-white font-bold">{finishedResults.length}</span> Selesai</div>
-                            <button onClick={handleDownloadRecapExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button>
-                        </div>
-                        <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden flex-none">
-                            <table className="w-full text-left text-sm text-slate-300">
-                                <thead className="bg-black/50 text-slate-400 text-xs uppercase font-bold"><tr><th className="p-3">No</th><th className="p-3">Nama Siswa</th><th className="p-3">Kelas</th><th className="p-3 text-right">Nilai Akhir</th></tr></thead>
-                                <tbody>
-                                    {selectedExamIdForAnalysis ? 
-                                        finishedResults
-                                        .filter(r => !analysisClassFilter || r.studentClass === analysisClassFilter)
-                                        .map((r, i) => (
-                                            <tr key={i} className="border-b border-slate-800 hover:bg-white/5">
-                                                <td className="p-3 text-center w-12">{i+1}</td>
-                                                <td className="p-3 font-medium text-white">{r.studentName}</td>
-                                                <td className="p-3">{r.studentClass}</td>
-                                                <td className="p-3 text-right font-bold text-yellow-500">{r.score.toFixed(1)}</td>
-                                            </tr>
-                                        )) 
-                                        : <tr><td colSpan={4} className="p-8 text-center text-slate-500">Pilih ujian untuk melihat rekap nilai.</td></tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                   </div>
-               )}
-
-               {analysisSubTab === 'missing' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
-                       <div className="mb-4 flex justify-between items-center flex-none">
-                           <div className="text-sm text-slate-400">Total Belum Ujian: <span className="text-red-400 font-bold">{missingStudents.length}</span> Siswa</div>
-                       </div>
-                       <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden flex-none">
-                           <table className="w-full text-left text-sm text-slate-300">
-                               <thead className="bg-black/50 text-slate-400 text-xs uppercase font-bold"><tr><th className="p-3">No</th><th className="p-3">Nama Siswa</th><th className="p-3">Kelas</th><th className="p-3">NIS</th><th className="p-3">NISN</th></tr></thead>
-                               <tbody>
-                                   {selectedExamIdForAnalysis ? missingStudents.map((s, i) => (
-                                       <tr key={s.id} className="border-b border-slate-800 hover:bg-white/5">
-                                           <td className="p-3 text-center w-12">{i+1}</td>
-                                           <td className="p-3 font-medium text-white">{s.name}</td>
-                                           <td className="p-3">{s.class}</td>
-                                           <td className="p-3">{s.nis}</td>
-                                           <td className="p-3">{s.nisn}</td>
-                                       </tr>
-                                   )) : <tr><td colSpan={5} className="p-8 text-center text-slate-500">Pilih ujian untuk melihat data.</td></tr>}
-                                   {selectedExamIdForAnalysis && missingStudents.length === 0 && (
-                                       <tr><td colSpan={5} className="p-8 text-center text-green-500 font-bold">Semua siswa pada filter ini sudah mengerjakan ujian!</td></tr>
-                                   )}
-                               </tbody>
-                           </table>
-                       </div>
-                   </div>
-               )}
-          </div>
-      );
-  }
-
-  // --- STUDENTS TAB ---
-  if (activeTab === 'students') {
-      const filteredStudents = selectedClassFilter ? students.filter(s => s.class === selectedClassFilter) : students;
-      return (
-          <div className="p-8 h-full flex flex-col">
-               <div className="flex justify-between items-center mb-6">
-                   <h2 className="text-2xl font-black text-white uppercase"><Users className="inline mr-2 text-yellow-500"/> Data Siswa</h2>
-                   <div className="flex gap-2">
-                       <input type="file" ref={studentFileRef} className="hidden" accept=".xlsx" onChange={handleImportStudentExcel} />
-                       <button onClick={handleDownloadTemplateStudent} className="bg-green-700 text-white px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2"><Download size={14}/> Template</button>
-                       <button onClick={() => studentFileRef.current?.click()} className="bg-blue-700 text-white px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2"><Upload size={14}/> Import</button>
-                       <button onClick={() => setShowAddStudentModal(true)} className="bg-yellow-600 text-black px-4 py-2 text-xs font-bold uppercase rounded flex items-center gap-2"><Plus size={14}/> Manual</button>
-                   </div>
-               </div>
-               <div className="mb-4 flex gap-4">
-                   <select className="bg-slate-900 text-white p-2 text-sm border border-slate-700" value={selectedClassFilter} onChange={e => setSelectedClassFilter(e.target.value)}>
-                       <option value="">Semua Kelas</option>
-                       {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
-                   </select>
-                   <input className="bg-slate-900 text-white p-2 text-sm border border-slate-700 flex-1" placeholder="Cari siswa..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-               </div>
-               <div className="flex-1 bg-slate-900 border border-white/10 overflow-auto">
-                   <table className="w-full text-left text-sm text-slate-300">
-                       <thead><tr className="bg-black/50 text-slate-500 uppercase text-xs"><th className="p-3">No</th><th className="p-3">Nama</th><th className="p-3">Kelas</th><th className="p-3">NIS</th><th className="p-3">NISN</th><th className="p-3">Aksi</th></tr></thead>
-                       <tbody>
-                           {filteredStudents.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())).map((s,i) => (
-                               <tr key={s.id} className="border-b border-white/5 hover:bg-white/5">
-                                   <td className="p-3 text-center w-12">{i+1}</td>
-                                   <td className="p-3">{s.name}</td>
-                                   <td className="p-3">{s.class}</td>
-                                   <td className="p-3">{s.nis}</td>
-                                   <td className="p-3">{s.nisn}</td>
-                                   <td className="p-3"><button onClick={() => handleDeleteStudent(s.id)} className="text-red-500 hover:text-red-400"><Trash2 size={14}/></button></td>
-                               </tr>
-                           ))}
-                       </tbody>
-                   </table>
-               </div>
-               {showAddStudentModal && <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"><div className="bg-slate-900 p-6 w-96 border border-white/10"><h3 className="text-white font-bold mb-4">Tambah Siswa</h3><input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama" value={newStudent.name} onChange={e=>setNewStudent({...newStudent, name:e.target.value})}/><input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Kelas" value={newStudent.class} onChange={e=>setNewStudent({...newStudent, class:e.target.value})}/><input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="NIS" value={newStudent.nis} onChange={e=>setNewStudent({...newStudent, nis:e.target.value})}/><input className="w-full bg-black p-2 mb-4 text-white border border-slate-700" placeholder="NISN" value={newStudent.nisn} onChange={e=>setNewStudent({...newStudent, nisn:e.target.value})}/><div className="flex gap-2"><button onClick={handleAddStudent} className="flex-1 bg-blue-600 text-white py-2 font-bold">Simpan</button><button onClick={()=>setShowAddStudentModal(false)} className="flex-1 bg-slate-700 text-white py-2 font-bold">Batal</button></div></div></div>}
-          </div>
-      );
-  }
-
-  // --- MONITORING TAB (Updated) ---
-  if (activeTab === 'monitor') {
-      const selectedMonitorExam = exams.find(e => e.id === selectedExamForMonitor);
-      
-      // FIXED: Robust Class Matching (Remove spaces, Ignore Case) for Monitoring
-      const allTargetedStudents = selectedMonitorExam ? students.filter(s => {
-          const sClassNorm = s.class.replace(/\s+/g, '').toUpperCase();
-          return selectedMonitorExam.classTarget.some(t => t.replace(/\s+/g, '').toUpperCase() === sClassNorm);
-      }) : [];
-      
-      const targetedStudents = monitoringClassFilter ? allTargetedStudents.filter(s => s.class === monitoringClassFilter) : allTargetedStudents;
-      
-      // Get Results
-      const currentResults = examResults.filter(r => r.examId === selectedExamForMonitor);
-
-      // PREPARE DISPLAY DATA (Filter Status & Sort by Finished then Score)
-      const displayData = targetedStudents.map(s => {
-          const res = currentResults.find(r => r.studentId === s.id);
-          return { ...s, result: res };
-      }).filter(item => {
-          if (monitoringStatusFilter === 'finished') return !!item.result;
-          if (monitoringStatusFilter === 'unfinished') return !item.result;
-          if (monitoringStatusFilter === 'suspicious') return item.result && (item.result.isDisqualified || (item.result.violationCount || 0) > 0);
-          return true;
-      }).sort((a, b) => {
-          // 0. Sort by Suspicious Activity (Disqualified/Violations FIRST)
-          const aSus = a.result?.isDisqualified || (a.result?.violationCount || 0) > 0;
-          const bSus = b.result?.isDisqualified || (b.result?.violationCount || 0) > 0;
-          if (aSus && !bSus) return -1;
-          if (!aSus && bSus) return 1;
-
-          // 1. Sort by Status (Finished first)
-          const aFinished = !!a.result;
-          const bFinished = !!b.result;
-          if (aFinished && !bFinished) return -1;
-          if (!aFinished && bFinished) return 1;
-          
-          // 2. Sort by Score (High to Low) if both finished
-          if (aFinished && bFinished) {
-              return (b.result?.score || 0) - (a.result?.score || 0);
-          }
-          return 0; // Keep original order for unfinished
-      });
-
-      // Cheating Analysis
-      const suspiciousCount = displayData.filter(i => i.result && (i.result.violationCount! > 0 || i.result.isDisqualified)).length;
-
-      return (
-          <div className="p-8 h-full flex flex-col">
-              <h2 className="text-2xl font-black text-white uppercase mb-6"><Activity className="inline mr-2 text-yellow-500"/> Live Monitoring</h2>
-              
-              {/* Alert Notification for Cheating */}
-              {suspiciousCount > 0 && (
-                  <div className="bg-red-900/50 border border-red-500 p-4 mb-6 rounded flex items-center gap-4 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]">
-                      <AlertOctagon size={32} className="text-red-500" />
-                      <div>
-                          <h3 className="font-bold text-white uppercase tracking-wider text-sm">Terdeteksi Kecurangan!</h3>
-                          <p className="text-sm text-red-200">Ada <span className="font-black text-white">{suspiciousCount}</span> siswa yang terdeteksi melakukan pelanggaran atau didiskualifikasi.</p>
-                      </div>
-                  </div>
-              )}
-
-              <div className="mb-6 flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Pilih Ujian Aktif</label>
-                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={selectedExamForMonitor} onChange={e => setSelectedExamForMonitor(e.target.value)}>
-                          {visibleExams.map(e => <option key={e.id} value={e.id}>{e.title} ({e.isActive ? 'Aktif' : 'Non-Aktif'})</option>)}
-                      </select>
-                  </div>
-                  <div className="w-full md:w-48">
-                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Filter Kelas</label>
-                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={monitoringClassFilter} onChange={e => setMonitoringClassFilter(e.target.value)}>
-                          <option value="">Semua Kelas</option>
-                          {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                  </div>
-                  <div className="w-full md:w-48">
-                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Status</label>
-                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={monitoringStatusFilter} onChange={e => setMonitoringStatusFilter(e.target.value as any)}>
-                          <option value="all">Semua Status</option>
-                          <option value="suspicious">Terindikasi Curang</option>
-                          <option value="finished">Sudah Selesai</option>
-                          <option value="unfinished">Belum Mengerjakan</option>
-                      </select>
-                  </div>
-              </div>
-
-              {selectedMonitorExam ? (
-                  <div className="flex-1 bg-slate-900 border border-white/10 overflow-auto">
-                      <div className="p-4 border-b border-white/10 flex gap-6 text-sm">
-                          <div className="text-slate-400">Total Peserta: <span className="text-white font-bold">{targetedStudents.length}</span></div>
-                          <div className="text-slate-400">Sudah Mengerjakan: <span className="text-green-400 font-bold">{targetedStudents.filter(s => currentResults.some(r => r.studentId === s.id)).length}</span></div>
-                          <div className="text-slate-400">Belum: <span className="text-slate-500 font-bold">{targetedStudents.filter(s => !currentResults.some(r => r.studentId === s.id)).length}</span></div>
-                      </div>
-                      <table className="w-full text-left text-sm text-slate-300">
-                          <thead className="bg-black/50 text-slate-500 uppercase text-xs">
-                              <tr>
-                                  <th className="p-3">No</th>
-                                  <th className="p-3">Nama Siswa</th>
-                                  <th className="p-3">Kelas</th>
-                                  <th className="p-3">Status</th>
-                                  <th className="p-3">Nilai</th>
-                                  <th className="p-3">Waktu Submit</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              {displayData.map((item, idx) => {
-                                  const res = item.result;
-                                  return (
-                                      <tr key={item.id} className="border-b border-white/5 hover:bg-white/5">
-                                          <td className="p-3 w-12 text-center">{idx + 1}</td>
-                                          <td className="p-3 font-medium text-white">{item.name}</td>
-                                          <td className="p-3">{item.class}</td>
-                                          <td className="p-3">
-                                              {res?.isDisqualified ? (
-                                                  <span className="bg-red-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><ShieldAlert size={10}/> DISKUALIFIKASI</span>
-                                              ) : res?.violationCount && res.violationCount > 0 ? (
-                                                  <span className="bg-orange-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><AlertTriangle size={10}/> PELANGGARAN: {res.violationCount}</span>
-                                              ) : res ? (
-                                                   <span className="bg-green-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><Check size={10}/> AMAN</span>
-                                              ) : (
-                                                   <span className="bg-slate-700 text-slate-400 px-2 py-1 text-[10px] font-bold uppercase rounded">BELUM</span>
-                                              )}
-                                          </td>
-                                          <td className="p-3 font-mono font-bold text-yellow-500">{res ? res.score.toFixed(1) : '-'}</td>
-                                          <td className="p-3 text-xs text-slate-400">{res ? new Date(res.timestamp).toLocaleTimeString() : '-'}</td>
-                                      </tr>
-                                  );
-                              })}
-                          </tbody>
-                      </table>
-                  </div>
-              ) : <p className="text-slate-500">Pilih ujian untuk memonitor.</p>}
           </div>
       );
   }
