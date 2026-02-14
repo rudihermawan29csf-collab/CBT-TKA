@@ -274,14 +274,15 @@ const App = () => {
       };
 
       try {
+          // Change mode to standard to catch errors (requires App Script ContentService.createTextOutput)
           await fetch(APPS_SCRIPT_URL, {
               method: 'POST',
-              mode: 'no-cors', 
-              headers: { 'Content-Type': 'text/plain' },
+              redirect: 'follow', 
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify(payload)
           });
           setIsConnected(true);
-          console.log("Data upload initiated (Background Mode)");
+          console.log("Data upload SUCCESS (POST)");
       } catch (err: any) {
           console.error("Upload failed:", err);
           setSyncError("Upload Failed");
@@ -553,7 +554,12 @@ const App = () => {
                     schoolSettings={schoolSettings}
                     setSchoolSettings={setSchoolSettings}
                     examResults={examResults} 
-                    onSyncData={() => setTimeout(saveDataToServer, 3000)} 
+                    onSyncData={() => {
+                        // FORCE UPDATE REF before sync to ensure fresh data
+                        // This fixes the issue where data might be stale if clicked immediately
+                        stateRef.current = { students, questions, exams, packets, examResults, schoolSettings };
+                        setTimeout(saveDataToServer, 500); 
+                    }} 
                   />
                 )}
                 {session.role === Role.STUDENT && session.details && (
