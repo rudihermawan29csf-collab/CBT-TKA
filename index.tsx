@@ -268,6 +268,10 @@ const App = () => {
           try {
              json = JSON.parse(text);
           } catch(e) {
+             // If script returns HTML (Google error page), text might contain error details about permissions
+             if (text.includes("DriveApp") || text.includes("authorization") || text.includes("permission")) {
+                 throw new Error("SERVER PERMISSION ERROR: Google Apps Script needs authorization to access Drive. Please run 'setup()' manually in the script editor.");
+             }
              throw new Error("Invalid JSON response from server: " + text.substring(0, 50));
           }
 

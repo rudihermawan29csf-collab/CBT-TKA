@@ -244,7 +244,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               alert("Gambar berhasil diupload ke Google Drive!");
                           } catch (error: any) {
                               console.error("Upload failed", error);
-                              alert(`Gagal upload ke Google Drive. Error: ${error.message || 'Unknown error'}`);
+                              
+                              // SPECIFIC ERROR HANDLING FOR PERMISSIONS
+                              if (error.message.includes("DriveApp") || error.message.includes("authorization") || error.message.includes("permission")) {
+                                 alert(
+                                    "⚠️ GAGAL UPLOAD: IZIN AKSES DITOLAK\n\n" +
+                                    "Google Apps Script belum diizinkan mengakses Google Drive.\n\n" +
+                                    "SOLUSI UNTUK ADMIN:\n" +
+                                    "1. Buka Editor Google Apps Script.\n" +
+                                    "2. Jalankan fungsi 'setup()' secara manual sekali.\n" +
+                                    "3. Saat popup muncul, klik 'Review Permissions' -> 'Allow'.\n" +
+                                    "4. Lakukan 'New Deployment' lagi."
+                                 );
+                              } else {
+                                 alert(`Gagal upload ke Google Drive. Error: ${error.message || 'Unknown error'}`);
+                              }
+                              
                               // CRITICAL FIX: DO NOT FALLBACK TO BASE64
                               // This prevents contaminating the database with large strings
                               setNewQuestionImage(''); 
