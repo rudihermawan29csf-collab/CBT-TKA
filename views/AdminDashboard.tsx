@@ -210,8 +210,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   let width = img.width;
                   let height = img.height;
                   
-                  // HD Ready size
-                  const MAX_SIZE = 1280; 
+                  // Reduced size for better reliability (1024px)
+                  const MAX_SIZE = 1024; 
 
                   if (width > height) {
                       if (width > MAX_SIZE) {
@@ -232,7 +232,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       ctx.fillRect(0, 0, width, height);
                       ctx.drawImage(img, 0, 0, width, height);
                       
-                      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
                       
                       // UPLOAD PROCESS
                       if (onUploadImage) {
@@ -242,14 +242,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               const driveUrl = await onUploadImage(dataUrl, filename);
                               setNewQuestionImage(driveUrl);
                               alert("Gambar berhasil diupload ke Google Drive!");
-                          } catch (error) {
+                          } catch (error: any) {
                               console.error("Upload failed", error);
-                              alert("Gagal upload ke Google Drive. Pastikan skrip server sudah diupdate.");
+                              alert(`Gagal upload ke Google Drive. Error: ${error.message || 'Unknown error'}`);
                               // CRITICAL FIX: DO NOT FALLBACK TO BASE64
                               // This prevents contaminating the database with large strings
                               setNewQuestionImage(''); 
                           } finally {
                               setIsImageUploading(false);
+                              if (imageUploadRef.current) imageUploadRef.current.value = '';
                           }
                       } else {
                           // Legacy fallback if no handler provided (Should not happen in new version)

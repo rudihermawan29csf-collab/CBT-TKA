@@ -250,22 +250,35 @@ const App = () => {
           }
       };
 
-      const res = await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          redirect: 'follow',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-      });
+      try {
+          const res = await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              redirect: 'follow',
+              headers: { 'Content-Type': 'text/plain' }, // Plain text avoids CORS preflight issues
+              body: JSON.stringify(payload)
+          });
 
-      if (!res.ok) throw new Error("Network response was not ok");
-      
-      const text = await res.text();
-      const json = JSON.parse(text);
+          if (!res.ok) {
+               const errText = await res.text().catch(() => "Unknown Server Error");
+               throw new Error(`HTTP Error ${res.status}: ${errText}`);
+          }
+          
+          const text = await res.text();
+          let json;
+          try {
+             json = JSON.parse(text);
+          } catch(e) {
+             throw new Error("Invalid JSON response from server: " + text.substring(0, 50));
+          }
 
-      if (json.status === 'success' && json.url) {
-          return json.url;
-      } else {
-          throw new Error(json.message || "Upload failed");
+          if (json.status === 'success' && json.url) {
+              return json.url;
+          } else {
+              throw new Error(json.message || "Upload failed with unknown error");
+          }
+      } catch (e: any) {
+          console.error("Upload Error Details:", e);
+          throw e; // Re-throw to be caught by caller
       }
   };
 
@@ -314,7 +327,7 @@ const App = () => {
           const res = await fetch(APPS_SCRIPT_URL, {
               method: 'POST',
               redirect: 'follow', 
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify(payload)
           });
 
@@ -617,7 +630,7 @@ const App = () => {
                     activeTab={activeTab}
                     onLogout={handleLogout}
                     examResults={examResults} 
-                    onSaveResult={handleStudentSaveResult} 
+                    onSaveResult={handleStudentSaveResult}
                   />
                 )}
             </div>
@@ -627,5 +640,6 @@ const App = () => {
   );
 };
 
-const root = createRoot(document.getElementById('root')!);
+const container = document.getElementById('root');
+const root = createRoot(container!);
 root.render(<App />);
