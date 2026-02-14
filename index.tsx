@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 
 // --- CONFIGURATION ---
 // Updated URL for Google Drive Support
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxP1ZhDpNN2cOZl0b3inHEWiWNReHy2ZAK_lOgwKpWVTU1z3aSpoWQ1AYAlhlS0oT53/exec"; 
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCjKBWaEQMqUoWffYJgdSu8prDBJs6swaj3JjTBVpCYmu_oUCMNchoS325VTgeKioagQ/exec"; 
 
 const App = () => {
   // Helper hook for localStorage persistence

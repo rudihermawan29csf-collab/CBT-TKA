@@ -245,13 +245,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           } catch (error) {
                               console.error("Upload failed", error);
                               alert("Gagal upload ke Google Drive. Pastikan skrip server sudah diupdate.");
-                              // Fallback: Set Base64 but warn user
-                              setNewQuestionImage(dataUrl);
+                              // CRITICAL FIX: DO NOT FALLBACK TO BASE64
+                              // This prevents contaminating the database with large strings
+                              setNewQuestionImage(''); 
                           } finally {
                               setIsImageUploading(false);
                           }
                       } else {
-                          // Legacy fallback if no handler provided
+                          // Legacy fallback if no handler provided (Should not happen in new version)
                           setNewQuestionImage(dataUrl);
                       }
                   }
