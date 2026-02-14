@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Student, Teacher, Question, QuestionType, QuestionCategory, QuestionPacket, Exam, Role, SchoolSettings, ExamResult } from '../types';
-import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX, Sigma, Calculator, Divide, X as MultiplyIcon, Link } from 'lucide-react';
+import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX, Sigma, Calculator, Divide, X as MultiplyIcon, Link, RefreshCcw } from 'lucide-react';
 import { CLASS_LIST } from '../constants';
 import * as XLSX from 'xlsx';
 import ReactMarkdown from 'react-markdown';
@@ -25,8 +25,8 @@ interface AdminDashboardProps {
   onSyncData?: () => void;
   examResults?: ExamResult[];
   onUploadImage?: (base64: string, filename: string) => Promise<string>;
-  currentScriptUrl?: string; // New: Display current URL
-  onUpdateScriptUrl?: (url: string) => void; // New: Function to update URL
+  currentScriptUrl?: string; 
+  onUpdateScriptUrl?: (url: string) => void; 
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -212,8 +212,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   let width = img.width;
                   let height = img.height;
                   
-                  // Reduced size for better reliability (1024px)
-                  const MAX_SIZE = 1024; 
+                  // Reduced size for better reliability (800px is safer for base64 fallback)
+                  const MAX_SIZE = 800; 
 
                   if (width > height) {
                       if (width > MAX_SIZE) {
@@ -247,24 +247,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           } catch (error: any) {
                               console.error("Upload failed", error);
                               
-                              // SPECIFIC ERROR HANDLING FOR PERMISSIONS
-                              if (error.message.includes("DriveApp") || error.message.includes("authorization") || error.message.includes("permission") || error.message.includes("Exception")) {
-                                 alert(
-                                    "⚠️ GAGAL UPLOAD: IZIN AKSES DITOLAK\n\n" +
-                                    "Google Apps Script belum diizinkan mengakses Google Drive.\n\n" +
-                                    "SOLUSI UNTUK ADMIN:\n" +
-                                    "1. Buka Editor Google Apps Script.\n" +
-                                    "2. Jalankan fungsi 'setup()' secara manual sekali untuk memberi izin.\n" +
-                                    "3. Jika Anda melakukan 'New Deployment' setelah ini, URL Apps Script MUNGKIN BERUBAH.\n" +
-                                    "4. Salin URL baru dan tempel di menu Pengaturan aplikasi ini."
-                                 );
+                              // FALLBACK LOGIC: Ask user if they want to use local Base64
+                              const useOffline = confirm(
+                                  "⚠️ GAGAL UPLOAD KE SERVER\n\n" +
+                                  "Penyebab: " + (error.message || "Izin ditolak atau koneksi gagal.") + "\n\n" +
+                                  "Apakah Anda ingin menggunakan gambar ini secara LOKAL (Offline Mode)?\n" +
+                                  "Klik OK untuk tetap menyimpan gambar (tanpa link Google Drive)."
+                              );
+
+                              if (useOffline) {
+                                  setNewQuestionImage(dataUrl); // Use the base64 string
                               } else {
-                                 alert(`Gagal upload ke Google Drive. Error: ${error.message || 'Unknown error'}`);
+                                  setNewQuestionImage(''); // Clear if user cancels
                               }
-                              
-                              // CRITICAL FIX: DO NOT FALLBACK TO BASE64
-                              // This prevents contaminating the database with large strings
-                              setNewQuestionImage(''); 
                           } finally {
                               setIsImageUploading(false);
                               if (imageUploadRef.current) imageUploadRef.current.value = '';
@@ -574,13 +569,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {/* Server URL Config */}
                       <div className="p-4 bg-slate-800 border border-blue-500/50 rounded mb-6">
                           <label className="text-xs font-bold text-blue-400 uppercase block mb-1 flex items-center gap-2"><Link size={12}/> Google Apps Script URL (Server)</label>
-                          <input 
-                            type="text" 
-                            className="w-full bg-black border border-slate-600 p-3 text-white text-xs font-mono" 
-                            value={currentScriptUrl || ''} 
-                            onChange={e => onUpdateScriptUrl && onUpdateScriptUrl(e.target.value)} 
-                            placeholder="https://script.google.com/macros/s/..."
-                          />
+                          <div className="flex gap-2">
+                              <input 
+                                type="text" 
+                                className="flex-1 bg-black border border-slate-600 p-3 text-white text-xs font-mono" 
+                                value={currentScriptUrl || ''} 
+                                onChange={e => onUpdateScriptUrl && onUpdateScriptUrl(e.target.value)} 
+                                placeholder="https://script.google.com/macros/s/..."
+                              />
+                              <button 
+                                onClick={() => {
+                                    if(confirm("Reset URL ke default?")) {
+                                        onUpdateScriptUrl && onUpdateScriptUrl("https://script.google.com/macros/s/AKfycbwYsSCcTQP5H_7RFU0SdNX65dwopK7qKm_eoGam35-IyzH8NqdnwpN5sIN8V6PyKppelQ/exec");
+                                    }
+                                }}
+                                className="px-3 bg-slate-700 hover:bg-slate-600 text-white rounded border border-slate-600"
+                                title="Reset Default URL"
+                              >
+                                  <RefreshCcw size={14}/>
+                              </button>
+                          </div>
                           <p className="text-[10px] text-slate-400 mt-1">
                               Update URL ini jika Anda melakukan 'New Deployment' di Apps Script untuk memperbaiki permission.
                           </p>
