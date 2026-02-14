@@ -196,7 +196,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return `${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} s.d ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
   };
 
-  // Handle Image Upload (OPTIMIZED FOR DRIVE UPLOAD)
+  // Handle Image Upload (OPTIMIZED FOR GOOGLE DRIVE UPLOAD)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -208,9 +208,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   let width = img.width;
                   let height = img.height;
                   
-                  // OPTIMIZED SIZE for Drive Upload (Larger than Sheets limit)
-                  // 800px is good for clarity but keeps upload fast
-                  const MAX_SIZE = 800; 
+                  // NEW: Increased limit to 1024px for decent quality (HD Ready)
+                  // The backend will now upload this to Drive, so we don't need to fit in a cell
+                  const MAX_SIZE = 1024; 
 
                   if (width > height) {
                       if (width > MAX_SIZE) {
@@ -232,16 +232,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       ctx.fillRect(0, 0, width, height);
                       
                       ctx.drawImage(img, 0, 0, width, height);
-                      // Compress to JPEG 70% quality (Better quality for Drive)
-                      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                      // High Quality JPEG (0.8) for Drive storage
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
                       
-                      // Payload Safety Check: Prevent massive JSON failure
-                      // 1.5MB limit per image ensures the total POST request doesn't timeout
-                      if (dataUrl.length > 1500000) {
-                          alert("Gambar terlalu besar! Mohon gunakan gambar dengan resolusi lebih kecil.");
-                          return;
-                      }
-
                       setNewQuestionImage(dataUrl);
                   }
               };
@@ -432,7 +425,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setQuestions(newQuestions);
       setPackets(prev => prev.map(p => p.id === selectedPacketId ? { ...p, questionTypes: { ...p.questionTypes, [activeSlot]: manualType } } : p));
       
-      alert(`Soal No. ${activeSlot} tersimpan. Sinkronisasi dimulai (Upload Gambar ke Drive)...`); 
+      alert(`Soal No. ${activeSlot} tersimpan. Sinkronisasi dimulai...`); 
       triggerSync(); // Trigger sync
   };
 

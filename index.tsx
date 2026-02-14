@@ -18,7 +18,8 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 };
 
 // --- CONFIGURATION ---
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxGKomTaQ7fwU0PZcdHkFmM9bGQvu88_sVtlyWP6CR87RQvEBPjh7fLsbpQqvcD3DwvBg/exec"; 
+// Updated URL for Google Drive Support
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxP1ZhDpNN2cOZl0b3inHEWiWNReHy2ZAK_lOgwKpWVTU1z3aSpoWQ1AYAlhlS0oT53/exec"; 
 
 const App = () => {
   // Helper hook for localStorage persistence
@@ -275,18 +276,30 @@ const App = () => {
 
       try {
           // Change mode to standard to catch errors (requires App Script ContentService.createTextOutput)
-          await fetch(APPS_SCRIPT_URL, {
+          const res = await fetch(APPS_SCRIPT_URL, {
               method: 'POST',
               redirect: 'follow', 
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify(payload)
           });
-          setIsConnected(true);
-          console.log("Data upload SUCCESS (POST)");
+
+          if (!res.ok) throw new Error("Server HTTP Error");
+          
+          const text = await res.text();
+          const json = JSON.parse(text);
+
+          if (json.status === 'success') {
+              setIsConnected(true);
+              console.log("Data upload SUCCESS (POST)");
+          } else {
+              throw new Error(json.message || "Server Script Error");
+          }
+
       } catch (err: any) {
           console.error("Upload failed:", err);
           setSyncError("Upload Failed");
           setIsConnected(false);
+          alert("Gagal menyimpan ke server! Periksa koneksi atau ukuran gambar mungkin terlalu besar (Maksimal payload POST).");
       } finally {
           setIsSyncing(false);
       }
