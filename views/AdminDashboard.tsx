@@ -196,7 +196,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return `${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} s.d ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
   };
 
-  // Handle Image Upload (AGGRESSIVE COMPRESSION)
+  // Handle Image Upload (OPTIMIZED FOR DRIVE UPLOAD)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -208,10 +208,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   let width = img.width;
                   let height = img.height;
                   
-                  // AGGRESSIVE COMPRESSION for Google Sheets
-                  // Cell Limit is 50,000 characters. 
-                  // 350px * 350px at 0.5 quality ~ 10-25kb ~ 15k-35k characters (Safe)
-                  const MAX_SIZE = 350; 
+                  // OPTIMIZED SIZE for Drive Upload (Larger than Sheets limit)
+                  // 800px is good for clarity but keeps upload fast
+                  const MAX_SIZE = 800; 
 
                   if (width > height) {
                       if (width > MAX_SIZE) {
@@ -228,17 +227,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   canvas.height = height;
                   const ctx = canvas.getContext('2d');
                   if (ctx) {
-                      // Add white background (for透明 PNGs to JPG conversion artifact prevention)
+                      // Add white background (prevents transparency issues)
                       ctx.fillStyle = "#FFFFFF";
                       ctx.fillRect(0, 0, width, height);
                       
                       ctx.drawImage(img, 0, 0, width, height);
-                      // Compress to JPEG 50% quality (Very Aggressive)
-                      const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+                      // Compress to JPEG 70% quality (Better quality for Drive)
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
                       
-                      // Safety Check: Google Sheets Cell Limit is ~50,000 chars
-                      if (dataUrl.length > 48000) {
-                          alert("GAMBAR TERLALU BESAR/KOMPLEKS! Server menolak gambar ini karena melebihi batas penyimpanan sel Google Sheet. Mohon potong (crop) gambar menjadi lebih kecil atau gunakan gambar dengan resolusi lebih rendah.");
+                      // Payload Safety Check: Prevent massive JSON failure
+                      // 1.5MB limit per image ensures the total POST request doesn't timeout
+                      if (dataUrl.length > 1500000) {
+                          alert("Gambar terlalu besar! Mohon gunakan gambar dengan resolusi lebih kecil.");
                           return;
                       }
 
@@ -432,7 +432,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setQuestions(newQuestions);
       setPackets(prev => prev.map(p => p.id === selectedPacketId ? { ...p, questionTypes: { ...p.questionTypes, [activeSlot]: manualType } } : p));
       
-      alert(`Soal No. ${activeSlot} tersimpan. Sinkronisasi dimulai...`); 
+      alert(`Soal No. ${activeSlot} tersimpan. Sinkronisasi dimulai (Upload Gambar ke Drive)...`); 
       triggerSync(); // Trigger sync
   };
 
@@ -533,6 +533,97 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
+  // DATA SISWA
+  if (activeTab === 'students') {
+    const filteredStudents = students.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (selectedClassFilter === '' || s.class === selectedClassFilter)
+    );
+
+    return (
+      <div className="p-8 h-full flex flex-col">
+        <h2 className="text-2xl font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2"><GraduationCap className="text-yellow-500"/> Data Siswa</h2>
+        
+        {/* Toolbar */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between">
+           <div className="flex gap-2 flex-1">
+               <div className="relative flex-1 max-w-md">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+                   <input className="w-full bg-black border border-slate-700 rounded p-2 pl-10 text-white text-sm" placeholder="Cari Siswa..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
+               </div>
+               <select className="bg-black border border-slate-700 text-white rounded p-2 text-sm" value={selectedClassFilter} onChange={e=>setSelectedClassFilter(e.target.value)}>
+                   <option value="">Semua Kelas</option>
+                   {CLASS_LIST.map(c=><option key={c} value={c}>{c}</option>)}
+               </select>
+           </div>
+           <div className="flex gap-2">
+               <button onClick={handleDownloadTemplateStudent} className="bg-slate-800 text-white px-3 py-2 rounded text-xs font-bold uppercase border border-slate-600 flex items-center gap-2 hover:bg-slate-700"><Download size={14}/> Template</button>
+               <div className="relative">
+                   <input type="file" ref={studentFileRef} className="hidden" accept=".xlsx" onChange={handleImportStudentExcel} />
+                   <button onClick={() => studentFileRef.current?.click()} className="bg-green-700 text-white px-3 py-2 rounded text-xs font-bold uppercase border border-green-600 flex items-center gap-2 hover:bg-green-600"><FileSpreadsheet size={14}/> Import Excel</button>
+               </div>
+               <button onClick={() => setShowAddStudentModal(true)} className="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold uppercase border border-blue-500 flex items-center gap-2 hover:bg-blue-500"><Plus size={14}/> Tambah</button>
+           </div>
+        </div>
+
+        {/* Table */}
+        <div className="bg-slate-900 border border-white/10 rounded overflow-hidden flex-1 flex flex-col">
+            <div className="overflow-auto flex-1 custom-scrollbar">
+                <table className="w-full text-sm text-left text-slate-300">
+                    <thead className="text-xs text-slate-400 uppercase bg-black sticky top-0">
+                        <tr>
+                            <th className="px-6 py-3">No</th>
+                            <th className="px-6 py-3">Nama</th>
+                            <th className="px-6 py-3">Kelas</th>
+                            <th className="px-6 py-3">NIS</th>
+                            <th className="px-6 py-3">NISN</th>
+                            <th className="px-6 py-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredStudents.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-slate-500">Tidak ada data siswa.</td></tr>}
+                        {filteredStudents.map((s, i) => (
+                            <tr key={s.id} className="border-b border-slate-800 hover:bg-white/5">
+                                <td className="px-6 py-3">{i+1}</td>
+                                <td className="px-6 py-3 font-bold text-white">{s.name}</td>
+                                <td className="px-6 py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{s.class}</span></td>
+                                <td className="px-6 py-3 font-mono">{s.nis}</td>
+                                <td className="px-6 py-3 font-mono">{s.nisn}</td>
+                                <td className="px-6 py-3 text-center">
+                                    <button onClick={() => handleDeleteStudent(s.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16}/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="bg-black p-2 border-t border-slate-800 text-xs text-slate-500 px-6">Total: {filteredStudents.length} Siswa</div>
+        </div>
+
+        {/* Modal Add Student */}
+        {showAddStudentModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                <div className="bg-slate-900 border border-slate-700 p-6 rounded w-full max-w-sm">
+                    <h3 className="font-bold text-white mb-4">Tambah Siswa Manual</h3>
+                    <input className="w-full bg-black border border-slate-700 p-2 mb-2 text-white text-sm" placeholder="Nama Lengkap" value={newStudent.name} onChange={e=>setNewStudent({...newStudent, name:e.target.value})} />
+                    <select className="w-full bg-black border border-slate-700 p-2 mb-2 text-white text-sm" value={newStudent.class} onChange={e=>setNewStudent({...newStudent, class:e.target.value})}>
+                        <option value="">Pilih Kelas</option>
+                        {CLASS_LIST.map(c=><option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <input className="w-full bg-black border border-slate-700 p-2 mb-2 text-white text-sm" placeholder="NIS" value={newStudent.nis} onChange={e=>setNewStudent({...newStudent, nis:e.target.value})} />
+                    <input className="w-full bg-black border border-slate-700 p-2 mb-4 text-white text-sm" placeholder="NISN" value={newStudent.nisn} onChange={e=>setNewStudent({...newStudent, nisn:e.target.value})} />
+                    <div className="flex gap-2">
+                        <button onClick={handleAddStudent} className="flex-1 bg-blue-600 text-white py-2 font-bold text-sm">Simpan</button>
+                        <button onClick={() => setShowAddStudentModal(false)} className="flex-1 bg-slate-700 text-white py-2 font-bold text-sm">Batal</button>
+                    </div>
+                </div>
+            </div>
+        )}
+      </div>
+    );
+  }
+
+  // SETTINGS
   if (activeTab === 'settings') {
       return (
           <div className="p-8 h-full overflow-y-auto">
@@ -551,308 +642,223 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       );
   }
 
-  if (activeTab === 'analysis') {
-      // Logic for automatic fallback selection
-      const currentExamId = selectedExamIdForAnalysis || visibleExams[0]?.id || '';
-      const targetExam = exams.find(e => e.id === currentExamId);
-      
-      // FIXED: Robust Class Matching (Remove spaces, Ignore Case)
-      const targetStudents = targetExam ? students.filter(s => {
-          const sClassNorm = s.class.replace(/\s+/g, '').toUpperCase();
-          return targetExam.classTarget.some(t => t.replace(/\s+/g, '').toUpperCase() === sClassNorm);
-      }) : [];
-      
-      const filteredTargetStudents = analysisClassFilter ? targetStudents.filter(s => s.class === analysisClassFilter) : targetStudents;
-      
-      const finishedResults = currentExamId ? examResults.filter(r => r.examId === currentExamId) : [];
-      const finishedStudentIds = new Set(finishedResults.map(r => r.studentId));
-      
-      const missingStudents = filteredTargetStudents.filter(s => !finishedStudentIds.has(s.id));
-
-      return (
-          <div className="p-8 h-full flex flex-col overflow-hidden">
-               <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6 flex-none"><BarChart2 className="text-yellow-500"/> Analisis Hasil Ujian</h2>
-               <div className="bg-slate-900/80 p-4 border border-white/10 mb-6 flex flex-col md:flex-row gap-4 items-end flex-none">
-                   <div className="flex-1 w-full"><label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Pilih Ujian</label>
-                   <select 
-                      className="w-full bg-black/50 border border-slate-700 p-2 text-white text-sm" 
-                      value={currentExamId} 
-                      onChange={e => setSelectedExamIdForAnalysis(e.target.value)}
-                   >
-                       {visibleExams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
-                   </select>
-                   </div>
-                   {(analysisSubTab === 'recap' || analysisSubTab === 'missing') && (
-                       <div className="w-full md:w-48">
-                           <label className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Filter Kelas</label>
-                           <select className="w-full bg-black/50 border border-slate-700 p-2 text-white text-sm" value={analysisClassFilter} onChange={e => setAnalysisClassFilter(e.target.value)}>
-                               <option value="">Semua Kelas</option>
-                               {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
-                           </select>
-                       </div>
-                   )}
-                   <div className="flex bg-slate-900 border border-slate-700 p-1 rounded shrink-0">
-                       <button onClick={() => setAnalysisSubTab('item')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'item' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Butir Soal</button>
-                       <button onClick={() => setAnalysisSubTab('recap')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'recap' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Rekap Nilai</button>
-                       <button onClick={() => setAnalysisSubTab('missing')} className={`px-4 py-2 text-xs font-bold uppercase rounded ${analysisSubTab === 'missing' ? 'bg-yellow-600 text-black' : 'text-slate-400'}`}>Belum Ujian</button>
-                   </div>
-               </div>
-               
-               {analysisSubTab === 'item' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
-                       <div className="mb-4 flex justify-end"><button onClick={handleDownloadAnalysisExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button></div>
-                       {selectedExamForAnalysis ? (
-                           <div className="grid grid-cols-1 gap-4">{(selectedExamForAnalysis.questions || []).map((q, idx) => { const stats = getItemAnalysis(q.id, q); return (<div key={q.id} className="bg-slate-900 border border-slate-800 p-4 rounded"><div className="flex justify-between items-start mb-2"><span className="font-bold text-yellow-500 text-sm">Soal No. {idx + 1} ({q.type})</span><span className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${stats.correctRate > 70 ? 'bg-green-900 text-green-400' : stats.correctRate > 30 ? 'bg-yellow-900 text-yellow-400' : 'bg-red-900 text-red-400'}`}>{stats.correctRate > 70 ? 'Mudah' : stats.correctRate > 30 ? 'Sedang' : 'Sukar'}</span></div><p className="text-slate-300 text-sm mb-3 bg-black/20 p-2 rounded">{q.text}</p><div className="flex items-center gap-4 text-xs mb-4"><div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-red-500 to-green-500" style={{ width: `${stats.correctRate}%` }}></div></div><span className="font-mono text-white">{stats.correctRate.toFixed(0)}% Benar ({stats.correctCount}/{stats.totalAttempts})</span></div></div>); })}</div>
-                       ) : <p className="text-slate-500">Pilih ujian untuk melihat data.</p>}
-                   </div>
-               )}
-               
-               {analysisSubTab === 'recap' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
-                        <div className="mb-4 flex justify-between items-center flex-none">
-                            <div className="text-sm text-slate-400">Total: <span className="text-white font-bold">{finishedResults.length}</span> Selesai</div>
-                            <button onClick={handleDownloadRecapExcel} className="px-3 py-2 bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-2"><FileSpreadsheet size={14}/> Download Excel</button>
-                        </div>
-                        <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden flex-none">
-                            <table className="w-full text-left text-sm text-slate-300">
-                                <thead className="bg-black/50 text-slate-400 text-xs uppercase font-bold"><tr><th className="p-3">No</th><th className="p-3">Nama Siswa</th><th className="p-3">Kelas</th><th className="p-3 text-right">Nilai Akhir</th></tr></thead>
-                                <tbody>
-                                    {currentExamId ? 
-                                        finishedResults
-                                        .filter(r => !analysisClassFilter || r.studentClass === analysisClassFilter)
-                                        .map((r, i) => (
-                                            <tr key={i} className="border-b border-slate-800 hover:bg-white/5">
-                                                <td className="p-3 text-center w-12">{i+1}</td>
-                                                <td className="p-3 font-medium text-white">{r.studentName}</td>
-                                                <td className="p-3">{r.studentClass}</td>
-                                                <td className="p-3 text-right font-bold text-yellow-500">{r.score.toFixed(1)}</td>
-                                            </tr>
-                                        )) 
-                                        : <tr><td colSpan={4} className="p-8 text-center text-slate-500">Pilih ujian untuk melihat rekap nilai.</td></tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                   </div>
-               )}
-
-               {analysisSubTab === 'missing' && (
-                   <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
-                       <div className="mb-4 flex justify-between items-center flex-none">
-                           <div className="text-sm text-slate-400">Total Belum Ujian: <span className="text-red-400 font-bold">{missingStudents.length}</span> Siswa</div>
-                       </div>
-                       <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden flex-none">
-                           <table className="w-full text-left text-sm text-slate-300">
-                               <thead className="bg-black/50 text-slate-400 text-xs uppercase font-bold"><tr><th className="p-3">No</th><th className="p-3">Nama Siswa</th><th className="p-3">Kelas</th><th className="p-3">NIS</th><th className="p-3">NISN</th></tr></thead>
-                               <tbody>
-                                   {currentExamId ? missingStudents.map((s, i) => (
-                                       <tr key={s.id} className="border-b border-slate-800 hover:bg-white/5">
-                                           <td className="p-3 text-center w-12">{i+1}</td>
-                                           <td className="p-3 font-medium text-white">{s.name}</td>
-                                           <td className="p-3">{s.class}</td>
-                                           <td className="p-3">{s.nis}</td>
-                                           <td className="p-3">{s.nisn}</td>
-                                       </tr>
-                                   )) : <tr><td colSpan={5} className="p-8 text-center text-slate-500">Pilih ujian untuk melihat data.</td></tr>}
-                                   {currentExamId && missingStudents.length === 0 && (
-                                       <tr><td colSpan={5} className="p-8 text-center text-green-500 font-bold">Semua siswa pada filter ini sudah mengerjakan ujian!</td></tr>
-                                   )}
-                               </tbody>
-                           </table>
-                       </div>
-                   </div>
-               )}
-          </div>
-      );
-  }
-
-  // --- STUDENTS TAB ---
-  if (activeTab === 'students') {
-      const filteredStudents = selectedClassFilter ? students.filter(s => s.class === selectedClassFilter) : students;
-      return (
-          <div className="p-8 h-full flex flex-col">
-               <div className="flex justify-between items-center mb-6">
-                   <h2 className="text-2xl font-black text-white uppercase"><Users className="inline mr-2 text-yellow-500"/> Data Siswa</h2>
-                   <div className="flex gap-2">
-                       <input type="file" ref={studentFileRef} className="hidden" accept=".xlsx" onChange={handleImportStudentExcel} />
-                       <button onClick={handleDownloadTemplateStudent} className="bg-green-700 text-white px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2"><Download size={14}/> Template</button>
-                       <button onClick={() => studentFileRef.current?.click()} className="bg-blue-700 text-white px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2"><Upload size={14}/> Import</button>
-                       <button onClick={() => setShowAddStudentModal(true)} className="bg-yellow-600 text-black px-4 py-2 text-xs font-bold uppercase rounded flex items-center gap-2"><Plus size={14}/> Manual</button>
-                   </div>
-               </div>
-               <div className="mb-4 flex gap-4">
-                   <select className="bg-slate-900 text-white p-2 text-sm border border-slate-700" value={selectedClassFilter} onChange={e => setSelectedClassFilter(e.target.value)}>
-                       <option value="">Semua Kelas</option>
-                       {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
-                   </select>
-                   <input className="bg-slate-900 text-white p-2 text-sm border border-slate-700 flex-1" placeholder="Cari siswa..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-               </div>
-               <div className="flex-1 bg-slate-900 border border-white/10 overflow-auto">
-                   <table className="w-full text-left text-sm text-slate-300">
-                       <thead><tr className="bg-black/50 text-slate-500 uppercase text-xs"><th className="p-3">No</th><th className="p-3">Nama</th><th className="p-3">Kelas</th><th className="p-3">NIS</th><th className="p-3">NISN</th><th className="p-3">Aksi</th></tr></thead>
-                       <tbody>
-                           {filteredStudents.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())).map((s,i) => (
-                               <tr key={s.id} className="border-b border-white/5 hover:bg-white/5">
-                                   <td className="p-3 text-center w-12">{i+1}</td>
-                                   <td className="p-3">{s.name}</td>
-                                   <td className="p-3">{s.class}</td>
-                                   <td className="p-3">{s.nis}</td>
-                                   <td className="p-3">{s.nisn}</td>
-                                   <td className="p-3"><button onClick={() => handleDeleteStudent(s.id)} className="text-red-500 hover:text-red-400"><Trash2 size={14}/></button></td>
-                               </tr>
-                           ))}
-                       </tbody>
-                   </table>
-               </div>
-               {showAddStudentModal && <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"><div className="bg-slate-900 p-6 w-96 border border-white/10"><h3 className="text-white font-bold mb-4">Tambah Siswa</h3><input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama" value={newStudent.name} onChange={e=>setNewStudent({...newStudent, name:e.target.value})}/><input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Kelas" value={newStudent.class} onChange={e=>setNewStudent({...newStudent, class:e.target.value})}/><input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="NIS" value={newStudent.nis} onChange={e=>setNewStudent({...newStudent, nis:e.target.value})}/><input className="w-full bg-black p-2 mb-4 text-white border border-slate-700" placeholder="NISN" value={newStudent.nisn} onChange={e=>setNewStudent({...newStudent, nisn:e.target.value})}/><div className="flex gap-2"><button onClick={handleAddStudent} className="flex-1 bg-blue-600 text-white py-2 font-bold">Simpan</button><button onClick={()=>setShowAddStudentModal(false)} className="flex-1 bg-slate-700 text-white py-2 font-bold">Batal</button></div></div></div>}
-          </div>
-      );
-  }
-
-  // --- MONITORING TAB (Updated) ---
+  // MONITORING
   if (activeTab === 'monitor') {
-      // Logic for automatic fallback selection
-      const currentMonitorId = selectedExamForMonitor || visibleExams[0]?.id || '';
-      const selectedMonitorExam = exams.find(e => e.id === currentMonitorId);
-      
-      // FIXED: Robust Class Matching (Remove spaces, Ignore Case) for Monitoring
-      const allTargetedStudents = selectedMonitorExam ? students.filter(s => {
-          const sClassNorm = s.class.replace(/\s+/g, '').toUpperCase();
-          return selectedMonitorExam.classTarget.some(t => t.replace(/\s+/g, '').toUpperCase() === sClassNorm);
-      }) : [];
-      
-      const targetedStudents = monitoringClassFilter ? allTargetedStudents.filter(s => s.class === monitoringClassFilter) : allTargetedStudents;
-      
-      // Get Results
-      const currentResults = examResults.filter(r => r.examId === currentMonitorId);
+    const activeExam = exams.find(e => e.id === selectedExamForMonitor);
+    // Filter students: Must be in exam target class AND (if filter active) match filter
+    const eligibleStudents = activeExam 
+      ? students.filter(s => {
+          const targetClasses = activeExam.classTarget.map(c => c.replace(/\s/g, '').toUpperCase());
+          const sClass = s.class.replace(/\s/g, '').toUpperCase();
+          const matchesTarget = targetClasses.includes(sClass);
+          const matchesFilter = monitoringClassFilter === '' || s.class === monitoringClassFilter;
+          return matchesTarget && matchesFilter;
+        })
+      : [];
+    
+    // Map status
+    const data = eligibleStudents.map(s => {
+        const res = examResults.find(r => r.examId === activeExam?.id && r.studentId === s.id);
+        const status = res ? (res.isDisqualified ? 'DISQUALIFIED' : 'SELESAI') : 'BELUM';
+        return { ...s, status, score: res?.score || 0, violations: res?.violationCount || 0, timestamp: res?.timestamp };
+    });
 
-      // PREPARE DISPLAY DATA (Filter Status & Sort by Finished then Score)
-      const displayData = targetedStudents.map(s => {
-          const res = currentResults.find(r => r.studentId === s.id);
-          return { ...s, result: res };
-      }).filter(item => {
-          if (monitoringStatusFilter === 'finished') return !!item.result;
-          if (monitoringStatusFilter === 'unfinished') return !item.result;
-          if (monitoringStatusFilter === 'suspicious') return item.result && (item.result.isDisqualified || (item.result.violationCount || 0) > 0);
-          return true;
-      }).sort((a, b) => {
-          // 0. Sort by Suspicious Activity (Disqualified/Violations FIRST)
-          const aSus = a.result?.isDisqualified || (a.result?.violationCount || 0) > 0;
-          const bSus = b.result?.isDisqualified || (b.result?.violationCount || 0) > 0;
-          if (aSus && !bSus) return -1;
-          if (!aSus && bSus) return 1;
+    // Apply Status Filter
+    const filteredData = data.filter(d => {
+        if(monitoringStatusFilter === 'finished') return d.status === 'SELESAI' || d.status === 'DISQUALIFIED';
+        if(monitoringStatusFilter === 'unfinished') return d.status === 'BELUM';
+        if(monitoringStatusFilter === 'suspicious') return d.violations > 0;
+        return true;
+    });
 
-          // 1. Sort by Status (Finished first)
-          const aFinished = !!a.result;
-          const bFinished = !!b.result;
-          if (aFinished && !bFinished) return -1;
-          if (!aFinished && bFinished) return 1;
-          
-          // 2. Sort by Score (High to Low) if both finished
-          if (aFinished && bFinished) {
-              return (b.result?.score || 0) - (a.result?.score || 0);
-          }
-          return 0; // Keep original order for unfinished
-      });
+    return (
+        <div className="p-8 h-full flex flex-col">
+            <h2 className="text-2xl font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2"><Activity className="text-yellow-500"/> Live Monitoring</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-slate-900 p-4 border border-slate-700">
+                    <label className="text-[10px] text-blue-400 uppercase font-bold block mb-1">Pilih Ujian</label>
+                    <select className="w-full bg-black text-white border border-slate-700 p-2 text-sm" value={selectedExamForMonitor} onChange={e=>setSelectedExamForMonitor(e.target.value)}>
+                        <option value="">-- Pilih Ujian --</option>
+                        {exams.filter(e=>e.isActive).map(e=><option key={e.id} value={e.id}>{e.title}</option>)}
+                        {exams.filter(e=>e.isActive).length===0 && <option disabled>Tidak ada ujian aktif</option>}
+                    </select>
+                </div>
+                <div className="bg-slate-900 p-4 border border-slate-700">
+                    <label className="text-[10px] text-blue-400 uppercase font-bold block mb-1">Filter Kelas</label>
+                    <select className="w-full bg-black text-white border border-slate-700 p-2 text-sm" value={monitoringClassFilter} onChange={e=>setMonitoringClassFilter(e.target.value)}>
+                        <option value="">Semua Kelas</option>
+                        {activeExam?.classTarget.map(c=><option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+                 <div className="bg-slate-900 p-4 border border-slate-700">
+                    <label className="text-[10px] text-blue-400 uppercase font-bold block mb-1">Status</label>
+                    <select className="w-full bg-black text-white border border-slate-700 p-2 text-sm" value={monitoringStatusFilter} onChange={e=>setMonitoringStatusFilter(e.target.value as any)}>
+                        <option value="all">Semua Status</option>
+                        <option value="finished">Selesai</option>
+                        <option value="unfinished">Belum Mengerjakan</option>
+                        <option value="suspicious">Terindikasi Curang</option>
+                    </select>
+                </div>
+                <div className="bg-slate-900 p-4 border border-slate-700 flex flex-col justify-center items-center">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Progress</span>
+                    <span className="text-2xl font-black text-white">{data.filter(d=>d.status!=='BELUM').length} / {data.length}</span>
+                </div>
+            </div>
 
-      // Cheating Analysis
-      const suspiciousCount = displayData.filter(i => i.result && (i.result.violationCount! > 0 || i.result.isDisqualified)).length;
+            <div className="bg-slate-900 border border-white/10 rounded overflow-hidden flex-1 flex flex-col">
+                <div className="overflow-auto flex-1 custom-scrollbar">
+                    <table className="w-full text-sm text-left text-slate-300">
+                        <thead className="text-xs text-slate-400 uppercase bg-black sticky top-0">
+                            <tr>
+                                <th className="px-6 py-3">Nama</th>
+                                <th className="px-6 py-3">Kelas</th>
+                                <th className="px-6 py-3 text-center">Status</th>
+                                <th className="px-6 py-3 text-center">Nilai</th>
+                                <th className="px-6 py-3 text-center">Pelanggaran</th>
+                                <th className="px-6 py-3 text-right">Waktu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {activeExam && filteredData.map((s, i) => (
+                                <tr key={i} className="border-b border-slate-800 hover:bg-white/5">
+                                    <td className="px-6 py-3 font-bold text-white">{s.name}</td>
+                                    <td className="px-6 py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{s.class}</span></td>
+                                    <td className="px-6 py-3 text-center">
+                                        {s.status === 'SELESAI' && <span className="text-green-500 font-bold text-xs bg-green-900/30 px-2 py-1 rounded">SELESAI</span>}
+                                        {s.status === 'DISQUALIFIED' && <span className="text-red-500 font-bold text-xs bg-red-900/30 px-2 py-1 rounded">DISKUALIFIKASI</span>}
+                                        {s.status === 'BELUM' && <span className="text-slate-500 font-bold text-xs bg-slate-800 px-2 py-1 rounded">BELUM</span>}
+                                    </td>
+                                    <td className="px-6 py-3 text-center font-mono text-yellow-500 font-bold">{s.status !== 'BELUM' ? Math.round(s.score) : '-'}</td>
+                                    <td className="px-6 py-3 text-center">
+                                        {s.violations > 0 ? (
+                                            <span className="text-red-500 flex items-center justify-center gap-1 font-bold"><AlertTriangle size={12}/> {s.violations}</span>
+                                        ) : <span className="text-slate-600">-</span>}
+                                    </td>
+                                    <td className="px-6 py-3 text-right font-mono text-xs">{s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : '-'}</td>
+                                </tr>
+                            ))}
+                            {!activeExam && <tr><td colSpan={6} className="text-center py-10 text-slate-500">Pilih ujian terlebih dahulu.</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
+  // ANALISIS
+  if (activeTab === 'analysis') {
+      const activeExam = exams.find(e => e.id === selectedExamIdForAnalysis);
 
       return (
           <div className="p-8 h-full flex flex-col">
-              <h2 className="text-2xl font-black text-white uppercase mb-6"><Activity className="inline mr-2 text-yellow-500"/> Live Monitoring</h2>
+              <h2 className="text-2xl font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2"><BarChart2 className="text-yellow-500"/> Analisis Hasil</h2>
               
-              {/* Alert Notification for Cheating */}
-              {suspiciousCount > 0 && (
-                  <div className="bg-red-900/50 border border-red-500 p-4 mb-6 rounded flex items-center gap-4 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]">
-                      <AlertOctagon size={32} className="text-red-500" />
-                      <div>
-                          <h3 className="font-bold text-white uppercase tracking-wider text-sm">Terdeteksi Kecurangan!</h3>
-                          <p className="text-sm text-red-200">Ada <span className="font-black text-white">{suspiciousCount}</span> siswa yang terdeteksi melakukan pelanggaran atau didiskualifikasi.</p>
+              <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-start md:items-center">
+                  <div className="flex gap-2">
+                       <select className="bg-black border border-slate-700 text-white rounded p-2 text-sm" value={selectedExamIdForAnalysis} onChange={e=>setSelectedExamIdForAnalysis(e.target.value)}>
+                           <option value="">-- Pilih Ujian --</option>
+                           {visibleExams.map(e=><option key={e.id} value={e.id}>{e.title}</option>)}
+                       </select>
+                  </div>
+                  {activeExam && (
+                      <div className="flex gap-2">
+                          <button onClick={() => setAnalysisSubTab('recap')} className={`px-4 py-2 rounded text-xs font-bold uppercase ${analysisSubTab==='recap' ? 'bg-yellow-500 text-black' : 'bg-slate-800 text-white'}`}>Rekap Nilai</button>
+                          <button onClick={() => setAnalysisSubTab('item')} className={`px-4 py-2 rounded text-xs font-bold uppercase ${analysisSubTab==='item' ? 'bg-yellow-500 text-black' : 'bg-slate-800 text-white'}`}>Analisis Soal</button>
                       </div>
-                  </div>
-              )}
-
-              <div className="mb-6 flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Pilih Ujian Aktif</label>
-                      <select 
-                        className="w-full bg-slate-900 border border-slate-700 text-white p-2" 
-                        value={currentMonitorId} 
-                        onChange={e => setSelectedExamForMonitor(e.target.value)}
-                      >
-                          {visibleExams.map(e => <option key={e.id} value={e.id}>{e.title} ({e.isActive ? 'Aktif' : 'Non-Aktif'})</option>)}
-                      </select>
-                  </div>
-                  <div className="w-full md:w-48">
-                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Filter Kelas</label>
-                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={monitoringClassFilter} onChange={e => setMonitoringClassFilter(e.target.value)}>
-                          <option value="">Semua Kelas</option>
-                          {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                  </div>
-                  <div className="w-full md:w-48">
-                      <label className="text-xs font-bold text-blue-400 uppercase block mb-1">Status</label>
-                      <select className="w-full bg-slate-900 border border-slate-700 text-white p-2" value={monitoringStatusFilter} onChange={e => setMonitoringStatusFilter(e.target.value as any)}>
-                          <option value="all">Semua Status</option>
-                          <option value="suspicious">Terindikasi Curang</option>
-                          <option value="finished">Sudah Selesai</option>
-                          <option value="unfinished">Belum Mengerjakan</option>
-                      </select>
-                  </div>
+                  )}
               </div>
 
-              {selectedMonitorExam ? (
-                  <div className="flex-1 bg-slate-900 border border-white/10 overflow-auto">
-                      <div className="p-4 border-b border-white/10 flex gap-6 text-sm">
-                          <div className="text-slate-400">Total Peserta: <span className="text-white font-bold">{targetedStudents.length}</span></div>
-                          <div className="text-slate-400">Sudah Mengerjakan: <span className="text-green-400 font-bold">{targetedStudents.filter(s => currentResults.some(r => r.studentId === s.id)).length}</span></div>
-                          <div className="text-slate-400">Belum: <span className="text-slate-500 font-bold">{targetedStudents.filter(s => !currentResults.some(r => r.studentId === s.id)).length}</span></div>
+              {activeExam ? (
+                  <div className="bg-slate-900 border border-white/10 rounded overflow-hidden flex-1 flex flex-col">
+                      {/* Toolbar Inside Panel */}
+                      <div className="p-4 border-b border-slate-800 flex justify-end">
+                           {analysisSubTab === 'recap' ? (
+                               <button onClick={handleDownloadRecapExcel} className="text-green-500 text-xs font-bold uppercase flex items-center gap-2 hover:text-green-400"><FileSpreadsheet size={16}/> Download Excel</button>
+                           ) : (
+                               <button onClick={handleDownloadAnalysisExcel} className="text-green-500 text-xs font-bold uppercase flex items-center gap-2 hover:text-green-400"><FileSpreadsheet size={16}/> Download Analisis</button>
+                           )}
                       </div>
-                      <table className="w-full text-left text-sm text-slate-300">
-                          <thead className="bg-black/50 text-slate-500 uppercase text-xs">
-                              <tr>
-                                  <th className="p-3">No</th>
-                                  <th className="p-3">Nama Siswa</th>
-                                  <th className="p-3">Kelas</th>
-                                  <th className="p-3">Status</th>
-                                  <th className="p-3">Nilai</th>
-                                  <th className="p-3">Waktu Submit</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              {displayData.map((item, idx) => {
-                                  const res = item.result;
-                                  return (
-                                      <tr key={item.id} className="border-b border-white/5 hover:bg-white/5">
-                                          <td className="p-3 w-12 text-center">{idx + 1}</td>
-                                          <td className="p-3 font-medium text-white">{item.name}</td>
-                                          <td className="p-3">{item.class}</td>
-                                          <td className="p-3">
-                                              {res?.isDisqualified ? (
-                                                  <span className="bg-red-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><ShieldAlert size={10}/> DISKUALIFIKASI</span>
-                                              ) : res?.violationCount && res.violationCount > 0 ? (
-                                                  <span className="bg-orange-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><AlertTriangle size={10}/> PELANGGARAN: {res.violationCount}</span>
-                                              ) : res ? (
-                                                   <span className="bg-green-600 text-white px-2 py-1 text-[10px] font-black uppercase rounded flex items-center w-fit gap-1"><Check size={10}/> AMAN</span>
-                                              ) : (
-                                                   <span className="bg-slate-700 text-slate-400 px-2 py-1 text-[10px] font-bold uppercase rounded">BELUM</span>
-                                              )}
-                                          </td>
-                                          <td className="p-3 font-mono font-bold text-yellow-500">{res ? res.score.toFixed(1) : '-'}</td>
-                                          <td className="p-3 text-xs text-slate-400">{res ? new Date(res.timestamp).toLocaleTimeString() : '-'}</td>
+
+                      <div className="overflow-auto flex-1 custom-scrollbar p-4">
+                          {analysisSubTab === 'recap' && (
+                              <table className="w-full text-sm text-left text-slate-300">
+                                  <thead className="text-xs text-slate-400 uppercase bg-black">
+                                      <tr>
+                                          <th className="px-4 py-2">Rank</th>
+                                          <th className="px-4 py-2">Nama</th>
+                                          <th className="px-4 py-2">Kelas</th>
+                                          <th className="px-4 py-2 text-center">Score</th>
+                                          <th className="px-4 py-2 text-center">Literasi</th>
+                                          <th className="px-4 py-2 text-center">Numerasi</th>
+                                          <th className="px-4 py-2 text-right">Waktu</th>
                                       </tr>
-                                  );
-                              })}
-                          </tbody>
-                      </table>
+                                  </thead>
+                                  <tbody>
+                                      {examResults.filter(r => r.examId === activeExam.id).sort((a,b) => b.score - a.score).map((r, i) => (
+                                          <tr key={i} className="border-b border-slate-800 hover:bg-white/5">
+                                              <td className="px-4 py-2 font-mono text-slate-500">#{i+1}</td>
+                                              <td className="px-4 py-2 font-bold text-white">{r.studentName}</td>
+                                              <td className="px-4 py-2"><span className="bg-slate-800 px-2 py-0.5 rounded text-[10px]">{r.studentClass}</span></td>
+                                              <td className="px-4 py-2 text-center font-black text-yellow-500">{Math.round(r.score)}</td>
+                                              <td className="px-4 py-2 text-center text-blue-400">{Math.round(r.literasiScore)}</td>
+                                              <td className="px-4 py-2 text-center text-green-400">{Math.round(r.numerasiScore)}</td>
+                                              <td className="px-4 py-2 text-right text-xs font-mono">{new Date(r.timestamp).toLocaleString()}</td>
+                                          </tr>
+                                      ))}
+                                      {examResults.filter(r => r.examId === activeExam.id).length === 0 && <tr><td colSpan={7} className="text-center py-10">Belum ada data nilai.</td></tr>}
+                                  </tbody>
+                              </table>
+                          )}
+
+                          {analysisSubTab === 'item' && (
+                              <div className="space-y-4">
+                                  {activeExam.questions.map((q, idx) => {
+                                      const stats = getItemAnalysis(q.id, q);
+                                      return (
+                                          <div key={q.id} className="bg-black/40 border border-slate-800 p-4 rounded flex gap-4">
+                                              <div className={`w-12 h-12 flex items-center justify-center font-black text-lg rounded ${stats.correctRate > 70 ? 'bg-green-600 text-white' : stats.correctRate > 40 ? 'bg-yellow-600 text-black' : 'bg-red-600 text-white'}`}>
+                                                  {Math.round(stats.correctRate)}%
+                                              </div>
+                                              <div className="flex-1">
+                                                  <div className="flex justify-between mb-1">
+                                                      <span className="font-bold text-white text-sm">Soal No. {idx+1}</span>
+                                                      <span className="text-xs text-slate-500">Dijawab Benar: {stats.correctCount} / {stats.totalAttempts} Siswa</span>
+                                                  </div>
+                                                  <p className="text-slate-400 text-sm line-clamp-2 mb-2">{q.text}</p>
+                                                  
+                                                  {/* Distractor Bar (Simple) */}
+                                                  {q.type === QuestionType.SINGLE && (
+                                                      <div className="flex h-2 rounded overflow-hidden bg-slate-800 mt-2">
+                                                          {['A','B','C','D'].map((opt, i) => {
+                                                              const count = stats.answerDist[i];
+                                                              const pct = stats.totalAttempts > 0 ? (count / stats.totalAttempts) * 100 : 0;
+                                                              if(pct === 0) return null;
+                                                              return (
+                                                                  <div key={i} className={`h-full ${i === q.correctAnswerIndex ? 'bg-green-500' : 'bg-red-500 opacity-50'}`} style={{width: `${pct}%`}} title={`${opt}: ${count} (${Math.round(pct)}%)`}></div>
+                                                              );
+                                                          })}
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          )}
+                      </div>
                   </div>
-              ) : <p className="text-slate-500">Pilih ujian untuk memonitor.</p>}
+              ) : (
+                  <div className="flex-1 border border-dashed border-slate-700 rounded flex items-center justify-center text-slate-500">
+                      Pilih ujian untuk melihat analisis data.
+                  </div>
+              )}
           </div>
       );
   }
 
-  // --- BANK SOAL TAB (Enhanced & Scroll Fixed) ---
+  // BANK SOAL (Existing Logic preserved)
   if (activeTab === 'questions') {
     return (
       <div className="p-8 flex flex-col h-full overflow-hidden">

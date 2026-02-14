@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 };
 
 // --- CONFIGURATION ---
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby5vRtUkaj69aj9i3T-6_i4ngFHaoEH0Zv5xWGoxRelP54_B5XShSeMgn8qKGJgoS3QRQ/exec"; 
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxGKomTaQ7fwU0PZcdHkFmM9bGQvu88_sVtlyWP6CR87RQvEBPjh7fLsbpQqvcD3DwvBg/exec"; 
 
 const App = () => {
   // Helper hook for localStorage persistence
@@ -189,13 +189,31 @@ const App = () => {
                   setExams(parsedExams);
               }
 
-              // 5. Load Results
+              // 5. Load Results (CRITICAL FIX: SMART MERGE)
+              // Jangan menimpa data lokal jika server belum punya data terbaru
               if(json.data.Results?.length > 0) {
                   const parsedResults = json.data.Results.map((r: any) => ({
                       ...r,
                       answers: safeJsonParse(r.answers, {})
                   }));
-                  setExamResults(parsedResults);
+                  
+                  setExamResults(prevLocalResults => {
+                      // Buat Map dari data server
+                      const serverMap = new Map(parsedResults.map((r: any) => [r.id, r]));
+                      
+                      // Mulai dengan data server
+                      const merged = [...parsedResults];
+
+                      // Cek data lokal: Jika ada ID di lokal tapi TIDAK ada di server, tambahkan ke merged
+                      // (Artinya data ini belum tersinkron ke server, jadi JANGAN DIHAPUS)
+                      prevLocalResults.forEach(localRes => {
+                          if (!serverMap.has(localRes.id)) {
+                              merged.push(localRes);
+                          }
+                      });
+                      
+                      return merged as ExamResult[];
+                  });
               }
               
               // 6. Load Settings
@@ -274,7 +292,7 @@ const App = () => {
   };
 
   const handleStudentSaveResult = async (result: ExamResult) => {
-      // 1. Optimistic Update (UI updates immediately)
+      // 1. Optimistic Update (UI updates immediately & Saved to LocalStorage via hook)
       setExamResults(prev => {
           if(prev.some(r => r.id === result.id)) return prev;
           return [...prev, result];
@@ -309,8 +327,6 @@ const App = () => {
                   
                   // OPTIONAL: Refresh other data refs to avoid overwriting Admin changes
                   if (json.data.Students) stateRef.current.students = json.data.Students;
-                  // We do NOT update Exams/Questions here to avoid complex parsing logic bugs during student submit,
-                  // assuming Students only append Results.
                   
                   console.log("Merge complete. Saving...");
               }
@@ -537,7 +553,7 @@ const App = () => {
                     schoolSettings={schoolSettings}
                     setSchoolSettings={setSchoolSettings}
                     examResults={examResults} 
-                    onSyncData={() => setTimeout(saveDataToServer, 1500)} 
+                    onSyncData={() => setTimeout(saveDataToServer, 3000)} 
                   />
                 )}
                 {session.role === Role.STUDENT && session.details && (
