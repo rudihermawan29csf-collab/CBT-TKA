@@ -50,7 +50,7 @@ const App = () => {
   // Data State with Persistence (localStorage)
   const [students, setStudents] = usePersistentState<Student[]>('cbt_students', MOCK_STUDENTS);
   const [questions, setQuestions] = usePersistentState<Question[]>('cbt_questions', MOCK_QUESTIONS);
-  const [exams, setExams] = usePersistentState<Exam[]>('cbt_exams', []); 
+  const [exams, setExams] = usePersistentState<Exam[]>('cbt_exams', MOCK_EXAMS); 
   const [packets, setPackets] = usePersistentState<QuestionPacket[]>('cbt_packets', MOCK_PACKETS);
   const [examResults, setExamResults] = usePersistentState<ExamResult[]>('cbt_results', []); 
   const [schoolSettings, setSchoolSettings] = usePersistentState<SchoolSettings>('cbt_settings', DEFAULT_SETTINGS);
