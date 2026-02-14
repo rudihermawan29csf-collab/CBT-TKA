@@ -196,7 +196,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return `${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} s.d ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
   };
 
-  // Handle Image Upload
+  // Handle Image Upload (COMPRESSED)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -207,7 +207,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   const canvas = document.createElement('canvas');
                   let width = img.width;
                   let height = img.height;
-                  const MAX_SIZE = 800; // Resize large images to max 800px
+                  // AGGRESSIVE COMPRESSION for Google Sheets
+                  const MAX_SIZE = 500; 
 
                   if (width > height) {
                       if (width > MAX_SIZE) {
@@ -223,11 +224,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   canvas.width = width;
                   canvas.height = height;
                   const ctx = canvas.getContext('2d');
-                  ctx?.drawImage(img, 0, 0, width, height);
-                  
-                  // Compress to JPEG 70% quality to save space
-                  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                  setNewQuestionImage(dataUrl);
+                  if (ctx) {
+                      ctx.drawImage(img, 0, 0, width, height);
+                      // Compress to JPEG 60% quality
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                      setNewQuestionImage(dataUrl);
+                  }
               };
               img.src = event.target?.result as string;
           };
@@ -379,7 +381,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           qData.image = '';
       } else {
           qData.stimulus = '';
-          qData.image = newQuestionImage;
+          qData.image = newQuestionImage; // This will now use the compressed image
       }
 
       // Handle Answers based on Type
@@ -405,19 +407,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           // Update Existing Question
           const existingId = newQuestions[existingQIndex].id;
           newQuestions[existingQIndex] = { ...newQuestions[existingQIndex], ...qData };
-          setEditingQuestionId(existingId); // Ensure state tracks correct ID
+          setEditingQuestionId(existingId); 
       } else {
           // Create New Question
           const newId = `q-${Date.now()}`;
           newQuestions.push({ ...qData, id: newId } as Question);
-          setEditingQuestionId(newId); // Ensure state tracks correct ID
+          setEditingQuestionId(newId); 
       }
 
       setQuestions(newQuestions);
       setPackets(prev => prev.map(p => p.id === selectedPacketId ? { ...p, questionTypes: { ...p.questionTypes, [activeSlot]: manualType } } : p));
       
-      alert(`Soal No. ${activeSlot} tersimpan`); 
-      triggerSync();
+      alert(`Soal No. ${activeSlot} tersimpan. Sinkronisasi dimulai...`); 
+      triggerSync(); // Trigger sync
   };
 
   const prepareSlotForm = (num: number) => {

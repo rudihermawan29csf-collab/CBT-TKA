@@ -537,7 +537,7 @@ const App = () => {
                     schoolSettings={schoolSettings}
                     setSchoolSettings={setSchoolSettings}
                     examResults={examResults} 
-                    onSyncData={() => setTimeout(saveDataToServer, 500)} 
+                    onSyncData={() => setTimeout(saveDataToServer, 1500)} 
                   />
                 )}
                 {session.role === Role.STUDENT && session.details && (
