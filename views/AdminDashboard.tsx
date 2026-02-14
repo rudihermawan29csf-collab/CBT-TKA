@@ -212,8 +212,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   let width = img.width;
                   let height = img.height;
                   
-                  // Reduced size for better reliability (800px is safer for base64 fallback)
-                  const MAX_SIZE = 800; 
+                  // Reduced size for better reliability (600px is safer for base64 fallback)
+                  // CHANGED: Reduced from 800 to 600
+                  const MAX_SIZE = 600; 
 
                   if (width > height) {
                       if (width > MAX_SIZE) {
@@ -234,7 +235,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       ctx.fillRect(0, 0, width, height);
                       ctx.drawImage(img, 0, 0, width, height);
                       
-                      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                      // CHANGED: Reduced quality from 0.8 to 0.6
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                       
                       // UPLOAD PROCESS
                       if (onUploadImage) {

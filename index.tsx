@@ -254,10 +254,12 @@ const App = () => {
       // Remove data:image/jpeg;base64, prefix if present for clean payload
       const cleanBase64 = base64Data.split(',')[1] || base64Data;
 
+      // FIXED: Added mimeType so GAS can recognize the blob correctly
       const payload = {
           action: 'upload',
           data: {
               image: cleanBase64,
+              mimeType: 'image/jpeg', 
               name: filename
           }
       };
