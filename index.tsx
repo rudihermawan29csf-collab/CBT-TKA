@@ -46,17 +46,15 @@ const App = () => {
   };
 
   // Dynamic Script URL State
+  // CHANGED STORAGE KEY TO FORCE UPDATE FOR USER
   const [scriptUrl, setScriptUrl] = useState<string>(() => {
-      // Prioritize the hardcoded default if the stored one is the old one (optional logic, but simple is better: trust storage or default)
-      // For this user request, I will trust they might want to reset or just use the default.
-      // To ensure the new URL takes effect for existing users who haven't changed it manually in settings:
-      const stored = localStorage.getItem('cbt_script_url');
+      const stored = localStorage.getItem('cbt_script_url_v2');
       return stored || DEFAULT_SCRIPT_URL;
   });
 
   // Save URL change to localStorage
   useEffect(() => {
-      localStorage.setItem('cbt_script_url', scriptUrl);
+      localStorage.setItem('cbt_script_url_v2', scriptUrl);
   }, [scriptUrl]);
 
   // Global App State
@@ -126,7 +124,7 @@ const App = () => {
           const text = await res.text();
           
           if (!text || text.trim() === '') throw new Error("Empty Response from Server");
-          if (text.trim().startsWith('<')) throw new Error("Invalid Server Response (HTML)");
+          if (text.trim().startsWith('<')) throw new Error("Invalid Server Response (HTML). Cek deployment 'Anyone' access.");
 
           let json;
           try { json = JSON.parse(text); } catch (e) { throw new Error("JSON Parse Failed: " + e.message); }
@@ -345,27 +343,45 @@ const App = () => {
           const res = await fetch(scriptUrl, {
               method: 'POST',
               redirect: 'follow', 
-              headers: { 'Content-Type': 'text/plain' },
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify(payload)
           });
 
-          if (!res.ok) throw new Error("Server HTTP Error");
+          if (!res.ok) {
+              const errText = await res.text().catch(() => "Unknown Error");
+              throw new Error(`HTTP ${res.status}: ${errText.substring(0, 100)}`);
+          }
           
           const text = await res.text();
-          const json = JSON.parse(text);
+          let json;
+          try {
+              json = JSON.parse(text);
+          } catch(e) {
+              // DETECT HTML ERROR PAGE (Google Often sends this for permission errors)
+              if (text.trim().startsWith('<')) {
+                  throw new Error("Server mengirim HTML (Bukan JSON). Kemungkinan masalah izin deployment. Pastikan 'Who has access' = 'Anyone'.");
+              }
+              throw new Error("Respon server tidak valid (Parse JSON Gagal).");
+          }
 
           if (json.status === 'success') {
               setIsConnected(true);
               console.log("Data upload SUCCESS (POST)");
           } else {
-              throw new Error(json.message || "Server Script Error");
+              throw new Error(json.message || "Server Script Error (Unknown)");
           }
 
       } catch (err: any) {
           console.error("Upload failed:", err);
           setSyncError("Upload Failed");
           setIsConnected(false);
-          alert("Gagal menyimpan ke server! Pastikan koneksi stabil. Jika error berlanjut, hubungi admin.");
+          
+          // DETAILED ALERT FOR USER
+          let msg = err.message || "Unknown Error";
+          if (msg === "Failed to fetch") {
+              msg = "Gagal Koneksi / CORS. Pastikan Deployment Script diset 'Anyone' (Siapa Saja).";
+          }
+          alert(`GAGAL MENYIMPAN!\n\nDetail Error: ${msg}\n\nSolusi:\n1. Cek koneksi internet.\n2. Pastikan Deploy Apps Script -> 'Who has access' = 'Anyone'.\n3. Coba refresh halaman.`);
       } finally {
           setIsSyncing(false);
       }
