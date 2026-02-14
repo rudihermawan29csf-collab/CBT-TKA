@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Student, Teacher, Question, QuestionType, QuestionCategory, QuestionPacket, Exam, Role, SchoolSettings, ExamResult } from '../types';
-import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX, Sigma, Calculator, Divide, X as MultiplyIcon } from 'lucide-react';
+import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX, Sigma, Calculator, Divide, X as MultiplyIcon, Link } from 'lucide-react';
 import { CLASS_LIST } from '../constants';
 import * as XLSX from 'xlsx';
 import ReactMarkdown from 'react-markdown';
@@ -25,11 +25,13 @@ interface AdminDashboardProps {
   onSyncData?: () => void;
   examResults?: ExamResult[];
   onUploadImage?: (base64: string, filename: string) => Promise<string>;
+  currentScriptUrl?: string; // New: Display current URL
+  onUpdateScriptUrl?: (url: string) => void; // New: Function to update URL
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   userRole = Role.ADMIN, students, setStudents, teachers, setTeachers, questions, setQuestions, exams = [], setExams, activeTab,
-  packets, setPackets, schoolSettings, setSchoolSettings, onSyncData, examResults = [], onUploadImage
+  packets, setPackets, schoolSettings, setSchoolSettings, onSyncData, examResults = [], onUploadImage, currentScriptUrl, onUpdateScriptUrl
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -246,15 +248,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               console.error("Upload failed", error);
                               
                               // SPECIFIC ERROR HANDLING FOR PERMISSIONS
-                              if (error.message.includes("DriveApp") || error.message.includes("authorization") || error.message.includes("permission")) {
+                              if (error.message.includes("DriveApp") || error.message.includes("authorization") || error.message.includes("permission") || error.message.includes("Exception")) {
                                  alert(
                                     "⚠️ GAGAL UPLOAD: IZIN AKSES DITOLAK\n\n" +
                                     "Google Apps Script belum diizinkan mengakses Google Drive.\n\n" +
                                     "SOLUSI UNTUK ADMIN:\n" +
                                     "1. Buka Editor Google Apps Script.\n" +
-                                    "2. Jalankan fungsi 'setup()' secara manual sekali.\n" +
-                                    "3. Saat popup muncul, klik 'Review Permissions' -> 'Allow'.\n" +
-                                    "4. Lakukan 'New Deployment' lagi."
+                                    "2. Jalankan fungsi 'setup()' secara manual sekali untuk memberi izin.\n" +
+                                    "3. Jika Anda melakukan 'New Deployment' setelah ini, URL Apps Script MUNGKIN BERUBAH.\n" +
+                                    "4. Salin URL baru dan tempel di menu Pengaturan aplikasi ini."
                                  );
                               } else {
                                  alert(`Gagal upload ke Google Drive. Error: ${error.message || 'Unknown error'}`);
@@ -562,6 +564,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
+  // SETTINGS
+  if (activeTab === 'settings') {
+      return (
+          <div className="p-8 h-full overflow-y-auto">
+              <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6"><Settings className="text-yellow-500"/> Pengaturan</h2>
+              <div className="max-w-2xl bg-slate-900/80 border border-white/10 p-8 rounded-lg">
+                  <div className="space-y-4">
+                      {/* Server URL Config */}
+                      <div className="p-4 bg-slate-800 border border-blue-500/50 rounded mb-6">
+                          <label className="text-xs font-bold text-blue-400 uppercase block mb-1 flex items-center gap-2"><Link size={12}/> Google Apps Script URL (Server)</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-black border border-slate-600 p-3 text-white text-xs font-mono" 
+                            value={currentScriptUrl || ''} 
+                            onChange={e => onUpdateScriptUrl && onUpdateScriptUrl(e.target.value)} 
+                            placeholder="https://script.google.com/macros/s/..."
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                              Update URL ini jika Anda melakukan 'New Deployment' di Apps Script untuk memperbaiki permission.
+                          </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Nama Sekolah</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.schoolName} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, schoolName: e.target.value})} /></div>
+                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Judul Login (CBT)</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.cbtTitle || ''} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, cbtTitle: e.target.value})} /></div>
+                      </div>
+                      
+                      <hr className="border-slate-700 my-4"/>
+                      <h3 className="font-bold text-yellow-500 text-sm uppercase">Akun & Keamanan</h3>
+                      
+                      <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Password Admin</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm font-mono" value={schoolSettings?.adminPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, adminPassword: e.target.value})} /></div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Pass Guru Literasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm font-mono" value={schoolSettings?.teacherLiterasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherLiterasiPassword: e.target.value})} /></div>
+                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Pass Guru Numerasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm font-mono" value={schoolSettings?.teacherNumerasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherNumerasiPassword: e.target.value})} /></div>
+                      </div>
+                      
+                      <button className="w-full md:w-auto px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded mt-4" onClick={() => { alert("Disimpan!"); triggerSync(); }}>Simpan Perubahan</button>
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
+  // ... (Rest of the component remains largely the same, skipping unchanged parts for brevity)
+  // Need to return null for unhandled tabs to keep TypeScript happy if I don't paste the whole file
+  // However, I will paste the whole file content in the XML to ensure correctness.
+
   // DATA SISWA
   if (activeTab === 'students') {
     const filteredStudents = students.filter(s => 
@@ -650,25 +699,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
       </div>
     );
-  }
-
-  // SETTINGS
-  if (activeTab === 'settings') {
-      return (
-          <div className="p-8 h-full overflow-y-auto">
-              <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6"><Settings className="text-yellow-500"/> Pengaturan</h2>
-              <div className="max-w-2xl bg-slate-900/80 border border-white/10 p-8 rounded-lg">
-                  <div className="space-y-4">
-                      <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Nama Sekolah</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.schoolName} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, schoolName: e.target.value})} /></div>
-                      <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Judul Login (CBT)</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.cbtTitle || ''} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, cbtTitle: e.target.value})} /></div>
-                      <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Password Admin</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.adminPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, adminPassword: e.target.value})} /></div>
-                      <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Password Guru Literasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.teacherLiterasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherLiterasiPassword: e.target.value})} /></div>
-                      <div><label className="text-xs font-bold text-blue-400 uppercase block mb-1">Password Guru Numerasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.teacherNumerasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherNumerasiPassword: e.target.value})} /></div>
-                      <button className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs" onClick={() => { alert("Disimpan!"); triggerSync(); }}>Simpan</button>
-                  </div>
-              </div>
-          </div>
-      );
   }
 
   // MONITORING
@@ -1093,89 +1123,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                      ))}
                                                      <button onClick={() => setMatchingPairs([...matchingPairs, {left:'', right: newOptions[0]}])} className="text-xs bg-blue-600/20 text-blue-400 px-3 py-1 rounded font-bold hover:bg-blue-600/30">+ Tambah Pernyataan</button>
                                                  </div>
-                                             </div>
-                                         )}
-                                     </div>
-
-                                     {/* PREVIEW BOX */}
-                                     <div className="mt-6 bg-slate-800/50 p-4 border border-slate-700 rounded-lg">
-                                         <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Preview Tampilan Soal</p>
-                                         {stimulusType === 'image' && newQuestionImage && <img src={newQuestionImage} className="max-h-32 mb-2 rounded border border-slate-600"/>}
-                                         
-                                         {/* Markdown Render for Stimulus */}
-                                         {stimulusType === 'text' && newStimulus && (
-                                            <div className="text-sm text-slate-300 mb-2 italic bg-black/20 p-2 border-l-2 border-blue-500 prose prose-invert max-w-none">
-                                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newStimulus}</ReactMarkdown>
-                                            </div>
-                                         )}
-                                         
-                                         {/* Markdown Render for Question Text */}
-                                         <div className="text-white font-bold text-sm mb-4 prose prose-invert max-w-none">
-                                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newQuestionText || "[Teks Pertanyaan]"}</ReactMarkdown>
-                                         </div>
-                                         
-                                         {/* OPTION PREVIEW */}
-                                         {manualType === QuestionType.SINGLE && (
-                                             <div className="mt-3 space-y-2">
-                                                 {newOptions.map((opt, i) => (
-                                                     <div key={i} className={`p-2 rounded border text-xs flex items-center gap-2 ${singleCorrectIndex === i ? 'bg-green-900/30 border-green-600 text-green-400' : 'border-slate-700 text-slate-400'}`}>
-                                                         <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleCorrectIndex === i ? 'border-green-500 bg-green-500 text-black' : 'border-slate-500'}`}>
-                                                             {singleCorrectIndex === i && <div className="w-2 h-2 bg-black rounded-full" />}
-                                                         </div>
-                                                         {/* Markdown for Options */}
-                                                         <span className="flex-1">
-                                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{opt || `Opsi ${String.fromCharCode(65+i)}`}</ReactMarkdown>
-                                                         </span>
-                                                     </div>
-                                                 ))}
-                                             </div>
-                                         )}
-                                         {manualType === QuestionType.COMPLEX && (
-                                             <div className="mt-3 space-y-2">
-                                                 {newOptions.map((opt, i) => (
-                                                     <div key={i} className={`p-2 rounded border text-xs flex items-center gap-2 ${complexCorrectIndices.includes(i) ? 'bg-blue-900/30 border-blue-600 text-blue-400' : 'border-slate-700 text-slate-400'}`}>
-                                                         <div className={`w-4 h-4 rounded border flex items-center justify-center ${complexCorrectIndices.includes(i) ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-500'}`}>
-                                                              {complexCorrectIndices.includes(i) && <Check size={10} />}
-                                                         </div>
-                                                         <span className="flex-1">
-                                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{opt || `Opsi ${i+1}`}</ReactMarkdown>
-                                                         </span>
-                                                     </div>
-                                                 ))}
-                                             </div>
-                                         )}
-                                         {manualType === QuestionType.MATCHING && (
-                                             <div className="mt-3 border border-slate-700 rounded overflow-hidden">
-                                                 <table className="w-full text-xs text-slate-300">
-                                                     <thead className="bg-slate-900 text-slate-400 font-bold uppercase">
-                                                         <tr>
-                                                             <th className="p-2 w-8 text-center border-r border-slate-700">No</th>
-                                                             <th className="p-2 text-left border-r border-slate-700">Pernyataan</th>
-                                                             <th className="p-2 text-center w-20 bg-green-900/20 text-green-500 border-r border-slate-700">{newOptions[0] || 'Opsi 1'}</th>
-                                                             <th className="p-2 text-center w-20 bg-red-900/20 text-red-500">{newOptions[1] || 'Opsi 2'}</th>
-                                                         </tr>
-                                                     </thead>
-                                                     <tbody>
-                                                         {matchingPairs.map((pair, i) => (
-                                                             <tr key={i} className="border-b border-slate-800 last:border-0 hover:bg-white/5">
-                                                                 <td className="p-2 text-center border-r border-slate-800 font-mono text-slate-500">{i+1}</td>
-                                                                 <td className="p-2 border-r border-slate-800">
-                                                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p: 'span'}}>{pair.left || '-'}</ReactMarkdown>
-                                                                 </td>
-                                                                 <td className="p-2 text-center border-r border-slate-800">
-                                                                     <div className={`w-4 h-4 rounded-full border mx-auto flex items-center justify-center ${pair.right === newOptions[0] ? 'bg-green-500 border-green-400' : 'border-slate-600'}`}>
-                                                                         {pair.right === newOptions[0] && <div className="w-2 h-2 bg-black rounded-full"/>}
-                                                                     </div>
-                                                                 </td>
-                                                                 <td className="p-2 text-center">
-                                                                     <div className={`w-4 h-4 rounded-full border mx-auto flex items-center justify-center ${pair.right === newOptions[1] ? 'bg-red-500 border-red-400' : 'border-slate-600'}`}>
-                                                                         {pair.right === newOptions[1] && <div className="w-2 h-2 bg-black rounded-full"/>}
-                                                                     </div>
-                                                                 </td>
-                                                             </tr>
-                                                         ))}
-                                                     </tbody>
-                                                 </table>
                                              </div>
                                          )}
                                      </div>

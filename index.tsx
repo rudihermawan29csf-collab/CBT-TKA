@@ -18,8 +18,8 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 };
 
 // --- CONFIGURATION ---
-// Updated URL for Google Drive Support
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCjKBWaEQMqUoWffYJgdSu8prDBJs6swaj3JjTBVpCYmu_oUCMNchoS325VTgeKioagQ/exec"; 
+// Default URL if not set in LocalStorage
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCjKBWaEQMqUoWffYJgdSu8prDBJs6swaj3JjTBVpCYmu_oUCMNchoS325VTgeKioagQ/exec"; 
 
 const App = () => {
   // Helper hook for localStorage persistence
@@ -44,6 +44,16 @@ const App = () => {
 
     return [state, setState];
   };
+
+  // Dynamic Script URL State
+  const [scriptUrl, setScriptUrl] = useState<string>(() => {
+      return localStorage.getItem('cbt_script_url') || DEFAULT_SCRIPT_URL;
+  });
+
+  // Save URL change to localStorage
+  useEffect(() => {
+      localStorage.setItem('cbt_script_url', scriptUrl);
+  }, [scriptUrl]);
 
   // Global App State
   const [session, setSession] = useState<UserSession | null>(null);
@@ -79,10 +89,10 @@ const App = () => {
 
   // --- SYNC ENGINE ---
   useEffect(() => {
-      if(APPS_SCRIPT_URL) {
+      if(scriptUrl) {
           fetchDataFromServer();
       }
-  }, []);
+  }, [scriptUrl]); // Refetch if URL changes
 
   // Helper for safe JSON parsing
   const safeJsonParse = (str: any, fallback: any) => {
@@ -97,12 +107,12 @@ const App = () => {
   };
 
   const fetchDataFromServer = async () => {
-      if(!APPS_SCRIPT_URL) return;
+      if(!scriptUrl) return;
       setIsSyncing(true);
       setSyncError('');
       
       try {
-          const res = await fetch(`${APPS_SCRIPT_URL}?action=read&t=${Date.now()}`, {
+          const res = await fetch(`${scriptUrl}?action=read&t=${Date.now()}`, {
              method: 'GET',
              redirect: 'follow',
              headers: { 'Content-Type': 'text/plain;charset=utf-8' }
@@ -237,7 +247,7 @@ const App = () => {
   // NEW: Dedicated function to upload a single image to Drive and get URL
   // This bypasses the massive payload limit by handling images one by one
   const uploadImageToServer = async (base64Data: string, filename: string): Promise<string> => {
-      if(!APPS_SCRIPT_URL) throw new Error("Server URL not configured");
+      if(!scriptUrl) throw new Error("Server URL not configured");
       
       // Remove data:image/jpeg;base64, prefix if present for clean payload
       const cleanBase64 = base64Data.split(',')[1] || base64Data;
@@ -251,7 +261,7 @@ const App = () => {
       };
 
       try {
-          const res = await fetch(APPS_SCRIPT_URL, {
+          const res = await fetch(scriptUrl, {
               method: 'POST',
               redirect: 'follow',
               headers: { 'Content-Type': 'text/plain' }, // Plain text avoids CORS preflight issues
@@ -269,8 +279,8 @@ const App = () => {
              json = JSON.parse(text);
           } catch(e) {
              // If script returns HTML (Google error page), text might contain error details about permissions
-             if (text.includes("DriveApp") || text.includes("authorization") || text.includes("permission")) {
-                 throw new Error("SERVER PERMISSION ERROR: Google Apps Script needs authorization to access Drive. Please run 'setup()' manually in the script editor.");
+             if (text.includes("DriveApp") || text.includes("authorization") || text.includes("permission") || text.includes("Exception")) {
+                 throw new Error(`SERVER PERMISSION ERROR: Apps Script Error. ${text.replace(/<[^>]*>?/gm, '').substring(0, 200)}... Check permissions.`);
              }
              throw new Error("Invalid JSON response from server: " + text.substring(0, 50));
           }
@@ -288,7 +298,7 @@ const App = () => {
 
   // Function to save data
   const saveDataToServer = async () => {
-      if(!APPS_SCRIPT_URL) return;
+      if(!scriptUrl) return;
       setIsSyncing(true);
       setSyncError('');
 
@@ -328,7 +338,7 @@ const App = () => {
 
       try {
           // Change mode to standard to catch errors (requires App Script ContentService.createTextOutput)
-          const res = await fetch(APPS_SCRIPT_URL, {
+          const res = await fetch(scriptUrl, {
               method: 'POST',
               redirect: 'follow', 
               headers: { 'Content-Type': 'text/plain' },
@@ -370,8 +380,8 @@ const App = () => {
           console.log("Starting reliable submit process...");
           
           // 2. READ: Fetch latest data from server first (critical for concurrency)
-          if(APPS_SCRIPT_URL) {
-              const res = await fetch(`${APPS_SCRIPT_URL}?action=read&t=${Date.now()}`);
+          if(scriptUrl) {
+              const res = await fetch(`${scriptUrl}?action=read&t=${Date.now()}`);
               const text = await res.text();
               const json = JSON.parse(text);
               
@@ -624,7 +634,9 @@ const App = () => {
                         stateRef.current = { students, questions, exams, packets, examResults, schoolSettings };
                         setTimeout(saveDataToServer, 500); 
                     }}
-                    onUploadImage={uploadImageToServer} 
+                    onUploadImage={uploadImageToServer}
+                    currentScriptUrl={scriptUrl}
+                    onUpdateScriptUrl={setScriptUrl}
                   />
                 )}
                 {session.role === Role.STUDENT && session.details && (
