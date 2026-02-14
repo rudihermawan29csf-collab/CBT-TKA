@@ -247,13 +247,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           } catch (error: any) {
                               console.error("Upload failed", error);
                               
+                              // DETAILED ERROR ANALYSIS
+                              const errString = error.message || error.toString();
+                              // Check for common permission error keywords in both English and Indonesian
+                              const isPermissionError = errString.includes("DriveApp") || 
+                                                        errString.includes("izin") || 
+                                                        errString.includes("permission") || 
+                                                        errString.includes("Exception");
+
+                              let message = "⚠️ GAGAL UPLOAD KE SERVER\n\n";
+                              
+                              if (isPermissionError) {
+                                  message += "MASALAH IZIN (SERVER): Script Google Anda belum memiliki izin akses Drive (DriveApp).\n\n";
+                                  message += "SOLUSI ADMIN: Buka Google Apps Script Editor, jalankan fungsi 'setup()' atau 'doPost()' secara manual sekali untuk memicu popup izin akses.\n\n";
+                              } else {
+                                  message += "Penyebab: " + errString + "\n\n";
+                              }
+                              
+                              message += "Apakah Anda ingin menggunakan gambar ini secara LOKAL (Offline Mode)?\n";
+                              message += "Klik OK untuk tetap menyimpan gambar (tanpa link Google Drive).";
+
                               // FALLBACK LOGIC: Ask user if they want to use local Base64
-                              const useOffline = confirm(
-                                  "⚠️ GAGAL UPLOAD KE SERVER\n\n" +
-                                  "Penyebab: " + (error.message || "Izin ditolak atau koneksi gagal.") + "\n\n" +
-                                  "Apakah Anda ingin menggunakan gambar ini secara LOKAL (Offline Mode)?\n" +
-                                  "Klik OK untuk tetap menyimpan gambar (tanpa link Google Drive)."
-                              );
+                              const useOffline = confirm(message);
 
                               if (useOffline) {
                                   setNewQuestionImage(dataUrl); // Use the base64 string
@@ -265,7 +280,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               if (imageUploadRef.current) imageUploadRef.current.value = '';
                           }
                       } else {
-                          // Legacy fallback if no handler provided (Should not happen in new version)
+                          // Legacy fallback if no handler provided
                           setNewQuestionImage(dataUrl);
                       }
                   }
@@ -580,7 +595,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <button 
                                 onClick={() => {
                                     if(confirm("Reset URL ke default?")) {
-                                        onUpdateScriptUrl && onUpdateScriptUrl("https://script.google.com/macros/s/AKfycbwYsSCcTQP5H_7RFU0SdNX65dwopK7qKm_eoGam35-IyzH8NqdnwpN5sIN8V6PyKppelQ/exec");
+                                        onUpdateScriptUrl && onUpdateScriptUrl("https://script.google.com/macros/s/AKfycbwiI1HFdBD-ai0nV9VudBp4XCn__wiqq1AIQ6iJ-dHzcYzey_LTCEPNNoDPmjEjjllc0Q/exec");
                                     }
                                 }}
                                 className="px-3 bg-slate-700 hover:bg-slate-600 text-white rounded border border-slate-600"

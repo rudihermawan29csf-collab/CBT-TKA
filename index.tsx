@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 
 // --- CONFIGURATION ---
 // Default URL if not set in LocalStorage
-const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYsSCcTQP5H_7RFU0SdNX65dwopK7qKm_eoGam35-IyzH8NqdnwpN5sIN8V6PyKppelQ/exec"; 
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwiI1HFdBD-ai0nV9VudBp4XCn__wiqq1AIQ6iJ-dHzcYzey_LTCEPNNoDPmjEjjllc0Q/exec"; 
 
 const App = () => {
   // Helper hook for localStorage persistence
