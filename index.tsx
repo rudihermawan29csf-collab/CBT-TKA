@@ -5,7 +5,7 @@ import { MOCK_STUDENTS, MOCK_QUESTIONS, MOCK_EXAMS, CLASS_LIST, MOCK_PACKETS } f
 import { Sidebar } from './components/Sidebar';
 import { AdminDashboard } from './views/AdminDashboard';
 import { StudentDashboard } from './views/StudentDashboard';
-import { User, Lock, Crosshair, Target, AlertTriangle, ChevronRight, ChevronDown, Cloud, CloudOff, RefreshCw, ExternalLink } from 'lucide-react';
+import { User, Lock, AlertTriangle, ChevronRight, ChevronDown, Cloud, CloudOff, RefreshCw, Loader2, Play, Shield, Target, Crosshair } from 'lucide-react';
 
 const DEFAULT_SETTINGS: SchoolSettings = {
   schoolName: 'SMPN 3 Pacet',
@@ -18,11 +18,9 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 };
 
 // --- CONFIGURATION ---
-// Default URL if not set in LocalStorage
-const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxL7lY6k-DcV2yGsohpAF04k1h3YzYQmsKGa5q9waoH2cd2P1sMYtx4nSr_Z4YqyeioQw/exec"; 
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwiI1HFdBD-ai0nV9VudBp4XCn__wiqq1AIQ6iJ-dHzcYzey_LTCEPNNoDPmjEjjllc0Q/exec"; 
 
 const App = () => {
-  // Helper hook for localStorage persistence
   const usePersistentState = <T,>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] => {
     const [state, setState] = useState<T>(() => {
       try {
@@ -45,30 +43,26 @@ const App = () => {
     return [state, setState];
   };
 
-  // Dynamic Script URL State
-  // CHANGED STORAGE KEY TO FORCE UPDATE FOR USER
   const [scriptUrl, setScriptUrl] = useState<string>(() => {
-      const stored = localStorage.getItem('cbt_script_url_v3');
+      const stored = localStorage.getItem('cbt_script_url_v4');
       return stored || DEFAULT_SCRIPT_URL;
   });
 
-  // Save URL change to localStorage
   useEffect(() => {
-      localStorage.setItem('cbt_script_url_v3', scriptUrl);
+      localStorage.setItem('cbt_script_url_v4', scriptUrl);
   }, [scriptUrl]);
 
   // Global App State
   const [session, setSession] = useState<UserSession | null>(null);
   
-  // Data State with Persistence (localStorage)
-  const [students, setStudents] = usePersistentState<Student[]>('cbt_students', MOCK_STUDENTS);
-  const [questions, setQuestions] = usePersistentState<Question[]>('cbt_questions', MOCK_QUESTIONS);
-  const [exams, setExams] = usePersistentState<Exam[]>('cbt_exams', MOCK_EXAMS); 
-  const [packets, setPackets] = usePersistentState<QuestionPacket[]>('cbt_packets', MOCK_PACKETS);
-  const [examResults, setExamResults] = usePersistentState<ExamResult[]>('cbt_results', []); 
-  const [schoolSettings, setSchoolSettings] = usePersistentState<SchoolSettings>('cbt_settings', DEFAULT_SETTINGS);
+  // Data State with Persistence
+  const [students, setStudents] = usePersistentState<Student[]>('cbt_students_v4', MOCK_STUDENTS);
+  const [questions, setQuestions] = usePersistentState<Question[]>('cbt_questions_v4', MOCK_QUESTIONS);
+  const [exams, setExams] = usePersistentState<Exam[]>('cbt_exams_v4', MOCK_EXAMS); 
+  const [packets, setPackets] = usePersistentState<QuestionPacket[]>('cbt_packets_v4', MOCK_PACKETS);
+  const [examResults, setExamResults] = usePersistentState<ExamResult[]>('cbt_results_v4', []); 
+  const [schoolSettings, setSchoolSettings] = usePersistentState<SchoolSettings>('cbt_settings_v4', DEFAULT_SETTINGS);
 
-  // REF FOR SYNCING: Keeps track of latest state to avoid stale closures in async functions
   const stateRef = useRef({ students, questions, exams, packets, examResults, schoolSettings });
   useEffect(() => {
       stateRef.current = { students, questions, exams, packets, examResults, schoolSettings };
@@ -78,7 +72,6 @@ const App = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string>('');
-
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Login Form State
@@ -94,18 +87,12 @@ const App = () => {
       if(scriptUrl) {
           fetchDataFromServer();
       }
-  }, [scriptUrl]); // Refetch if URL changes
+  }, [scriptUrl]); 
 
-  // Helper for safe JSON parsing
   const safeJsonParse = (str: any, fallback: any) => {
-    if (typeof str !== 'string') return str || fallback; // If already object or null/undefined
+    if (typeof str !== 'string') return str || fallback;
     if (!str || str.trim() === '') return fallback;
-    try {
-      return JSON.parse(str);
-    } catch (e) {
-      console.warn("Failed to parse JSON:", str);
-      return fallback;
-    }
+    try { return JSON.parse(str); } catch (e) { return fallback; }
   };
 
   const fetchDataFromServer = async () => {
@@ -122,25 +109,18 @@ const App = () => {
           
           if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
           const text = await res.text();
-          
-          if (!text || text.trim() === '') throw new Error("Empty Response from Server");
-          if (text.trim().startsWith('<')) throw new Error("Invalid Server Response (HTML). Cek deployment 'Anyone' access.");
-
           let json;
-          try { json = JSON.parse(text); } catch (e) { throw new Error("JSON Parse Failed: " + e.message); }
+          try { json = JSON.parse(text); } catch (e) { throw new Error("JSON Parse Failed"); }
 
           if(json.status === 'success') {
               let loadedQuestions: Question[] = [];
               let loadedPackets: QuestionPacket[] = [];
 
-              // 1. Load Students
               if(json.data.Students?.length > 0) setStudents(json.data.Students);
               
-              // 2. Load Questions
               if(json.data.Questions?.length > 0) {
                   loadedQuestions = json.data.Questions.map((q: any) => ({
                       ...q,
-                      // FORCE STRING TYPE FOR IDs to prevent Sheet Number conversion issues
                       packetId: String(q.packetId || ''),
                       number: parseInt(q.number || '0'), 
                       options: safeJsonParse(q.options, []),
@@ -150,47 +130,29 @@ const App = () => {
                   setQuestions(loadedQuestions);
               }
               
-              // 3. Load Packets
               if(json.data.Packets?.length > 0) {
                   loadedPackets = json.data.Packets.map((p: any) => ({
                       ...p,
-                      id: String(p.id || ''), // Force String
+                      id: String(p.id || ''), 
                       questionTypes: safeJsonParse(p.questionTypes, {})
                   }));
                   setPackets(loadedPackets);
               }
 
-              // 4. Load Exams (AND HYDRATE QUESTIONS)
               if(json.data.Exams?.length > 0) {
                   const parsedExams = json.data.Exams.map((e: any) => {
-                      // Parse boolean safely
                       let isActiveBool = e.isActive;
-                      if (typeof e.isActive === 'string') {
-                          isActiveBool = e.isActive.toLowerCase() === 'true';
-                      }
-
-                      // FORCE STRING for ID matching
+                      if (typeof e.isActive === 'string') { isActiveBool = e.isActive.toLowerCase() === 'true'; }
                       const examPacketId = String(e.packetId || '');
-
-                      // CRITICAL: Re-construct questions based on packetId
-                      // This solves the issue of the 'questions' column being empty in the spreadsheet
                       let examQuestions: Question[] = [];
                       if (examPacketId && loadedQuestions.length > 0) {
-                          // Find packet to get totalQuestions limit
                           const relatedPacket = loadedPackets.find(p => String(p.id) === examPacketId);
                           const limit = relatedPacket ? Number(relatedPacket.totalQuestions) : 999;
-
-                          // Filter from master list using STRICT STRING comparison
                           examQuestions = loadedQuestions
                               .filter(q => q.packetId === examPacketId && (q.number || 0) <= limit)
                               .sort((a, b) => (a.number || 0) - (b.number || 0));
                       }
-
-                      // If hydration failed (maybe questions not loaded yet?), fallback to parsed questions from sheet
-                      if (examQuestions.length === 0) {
-                           examQuestions = safeJsonParse(e.questions, []);
-                      }
-
+                      if (examQuestions.length === 0) { examQuestions = safeJsonParse(e.questions, []); }
                       return {
                           ...e,
                           packetId: examPacketId,
@@ -202,40 +164,26 @@ const App = () => {
                   setExams(parsedExams);
               }
 
-              // 5. Load Results (CRITICAL FIX: SMART MERGE)
-              // Jangan menimpa data lokal jika server belum punya data terbaru
               if(json.data.Results?.length > 0) {
                   const parsedResults = json.data.Results.map((r: any) => ({
                       ...r,
                       answers: safeJsonParse(r.answers, {})
                   }));
-                  
                   setExamResults(prevLocalResults => {
-                      // Buat Map dari data server
                       const serverMap = new Map(parsedResults.map((r: any) => [r.id, r]));
-                      
-                      // Mulai dengan data server
                       const merged = [...parsedResults];
-
-                      // Cek data lokal: Jika ada ID di lokal tapi TIDAK ada di server, tambahkan ke merged
-                      // (Artinya data ini belum tersinkron ke server, jadi JANGAN DIHAPUS)
                       prevLocalResults.forEach(localRes => {
-                          if (!serverMap.has(localRes.id)) {
-                              merged.push(localRes);
-                          }
+                          if (!serverMap.has(localRes.id)) { merged.push(localRes); }
                       });
-                      
                       return merged as ExamResult[];
                   });
               }
               
-              // 6. Load Settings
-              if(json.data.Settings && Object.keys(json.data.Settings).length > 0) {
-                  setSchoolSettings(prev => ({ ...prev, ...json.data.Settings }));
+              if(json.data.Settings) {
+                  setSchoolSettings(prev => ({ ...DEFAULT_SETTINGS, ...json.data.Settings }));
               }
               
               setIsConnected(true);
-              console.log("Sync Read Success");
           }
       } catch (err: any) {
           console.error("Failed to connect to server:", err);
@@ -246,15 +194,9 @@ const App = () => {
       }
   };
 
-  // NEW: Dedicated function to upload a single image to Drive and get URL
-  // This bypasses the massive payload limit by handling images one by one
   const uploadImageToServer = async (base64Data: string, filename: string): Promise<string> => {
       if(!scriptUrl) throw new Error("Server URL not configured");
-      
-      // Remove data:image/jpeg;base64, prefix if present for clean payload
       const cleanBase64 = base64Data.split(',')[1] || base64Data;
-
-      // FIXED: Added mimeType so GAS can recognize the blob correctly
       const payload = {
           action: 'upload',
           data: {
@@ -268,52 +210,41 @@ const App = () => {
           const res = await fetch(scriptUrl, {
               method: 'POST',
               redirect: 'follow',
-              headers: { 'Content-Type': 'text/plain' }, // Plain text avoids CORS preflight issues
+              headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify(payload)
           });
 
-          if (!res.ok) {
-               const errText = await res.text().catch(() => "Unknown Server Error");
-               throw new Error(`HTTP Error ${res.status}: ${errText}`);
-          }
-          
+          if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
           const text = await res.text();
           let json;
           try {
              json = JSON.parse(text);
           } catch(e) {
-             // If script returns HTML (Google error page), text might contain error details about permissions
-             if (text.includes("DriveApp") || text.includes("authorization") || text.includes("permission") || text.includes("Exception")) {
-                 throw new Error(`SERVER PERMISSION ERROR: Apps Script Error. ${text.replace(/<[^>]*>?/gm, '').substring(0, 200)}... Check permissions.`);
+             if (text.includes("DriveApp") || text.includes("Exception")) {
+                 throw new Error(`SERVER PERMISSION ERROR: ${text.replace(/<[^>]*>?/gm, '').substring(0, 150)}`);
              }
-             throw new Error("Invalid JSON response from server: " + text.substring(0, 50));
+             throw new Error("Invalid JSON response");
           }
 
-          if (json.status === 'success' && json.url) {
-              return json.url;
-          } else {
-              throw new Error(json.message || "Upload failed with unknown error");
-          }
+          if (json.status === 'success' && json.url) return json.url;
+          else throw new Error(json.message || "Upload failed");
       } catch (e: any) {
-          console.error("Upload Error Details:", e);
-          throw e; // Re-throw to be caught by caller
+          throw e; 
       }
   };
 
-  // Function to save data
   const saveDataToServer = async () => {
       if(!scriptUrl) return;
       setIsSyncing(true);
       setSyncError('');
 
-      // SERIALIZATION LOGIC: Stringify nested objects so they fit into Spreadsheet cells
       const payload = {
           action: 'write',
           data: {
               Students: stateRef.current.students,
               Questions: stateRef.current.questions.map(q => ({
                   ...q,
-                  packetId: String(q.packetId || ''), // Ensure sent as string
+                  packetId: String(q.packetId || ''),
                   number: q.number || 0,
                   options: JSON.stringify(q.options || []),
                   correctAnswerIndices: JSON.stringify(q.correctAnswerIndices || []),
@@ -327,8 +258,6 @@ const App = () => {
                   ...e,
                   packetId: String(e.packetId || ''),
                   classTarget: JSON.stringify(e.classTarget || []),
-                  // We send empty array for questions to save space in Sheet. 
-                  // The App will re-hydrate them based on packetId on load.
                   questions: "[]", 
                   isActive: e.isActive 
               })),
@@ -341,7 +270,6 @@ const App = () => {
       };
 
       try {
-          // Change mode to standard to catch errors (requires App Script ContentService.createTextOutput)
           const res = await fetch(scriptUrl, {
               method: 'POST',
               redirect: 'follow', 
@@ -349,94 +277,55 @@ const App = () => {
               body: JSON.stringify(payload)
           });
 
-          if (!res.ok) {
-              const errText = await res.text().catch(() => "Unknown Error");
-              throw new Error(`HTTP ${res.status}: ${errText.substring(0, 100)}`);
-          }
-          
+          if (!res.ok) throw new Error("HTTP Error");
           const text = await res.text();
-          let json;
-          try {
-              json = JSON.parse(text);
-          } catch(e) {
-              // DETECT HTML ERROR PAGE (Google Often sends this for permission errors)
-              if (text.trim().startsWith('<')) {
-                  throw new Error("Server mengirim HTML (Bukan JSON). Kemungkinan masalah izin deployment. Pastikan 'Who has access' = 'Anyone'.");
-              }
-              throw new Error("Respon server tidak valid (Parse JSON Gagal).");
-          }
+          const json = JSON.parse(text);
 
           if (json.status === 'success') {
               setIsConnected(true);
-              console.log("Data upload SUCCESS (POST)");
+              console.log("Data upload SUCCESS");
           } else {
-              throw new Error(json.message || "Server Script Error (Unknown)");
+              throw new Error(json.message || "Server Script Error");
           }
 
       } catch (err: any) {
           console.error("Upload failed:", err);
           setSyncError("Upload Failed");
           setIsConnected(false);
-          
-          // DETAILED ALERT FOR USER
-          let msg = err.message || "Unknown Error";
-          if (msg === "Failed to fetch") {
-              msg = "Gagal Koneksi / CORS. Pastikan Deployment Script diset 'Anyone' (Siapa Saja).";
-          }
-          alert(`GAGAL MENYIMPAN!\n\nDetail Error: ${msg}\n\nSolusi:\n1. Cek koneksi internet.\n2. Pastikan Deploy Apps Script -> 'Who has access' = 'Anyone'.\n3. Coba refresh halaman.`);
+          alert(`GAGAL MENYIMPAN!\n\nDetail Error: ${err.message}\n\nSolusi:\n1. Cek koneksi internet.\n2. Pastikan Deploy Apps Script -> 'Who has access' = 'Anyone'.\n3. Coba refresh halaman.`);
       } finally {
           setIsSyncing(false);
       }
   };
 
   const handleStudentSaveResult = async (result: ExamResult) => {
-      // 1. Optimistic Update (UI updates immediately & Saved to LocalStorage via hook)
       setExamResults(prev => {
           if(prev.some(r => r.id === result.id)) return prev;
           return [...prev, result];
       });
 
       setIsSyncing(true);
-      
       try {
-          console.log("Starting reliable submit process...");
-          
-          // 2. READ: Fetch latest data from server first (critical for concurrency)
           if(scriptUrl) {
               const res = await fetch(`${scriptUrl}?action=read&t=${Date.now()}`);
               const text = await res.text();
               const json = JSON.parse(text);
-              
               if(json.status === 'success') {
-                  // 3. MERGE: Get server results and append/update with current student result
                   const serverResults = json.data.Results || [];
                   const parsedServerResults = serverResults.map((r: any) => ({
                       ...r,
                       answers: safeJsonParse(r.answers, {})
                   }));
-
-                  // Remove if this student ID + exam ID already exists (overwrite scenario) or just append
-                  // For safety, let's filter out any existing result with same ID to prevent duplicates
                   const otherResults = parsedServerResults.filter((r: ExamResult) => r.id !== result.id);
                   const mergedResults = [...otherResults, result];
-                  
-                  // Update stateRef so saveDataToServer uses this fresh, merged list
                   stateRef.current.examResults = mergedResults;
-                  
-                  // OPTIONAL: Refresh other data refs to avoid overwriting Admin changes
                   if (json.data.Students) stateRef.current.students = json.data.Students;
-                  
-                  console.log("Merge complete. Saving...");
               }
           }
-
-          // 4. WRITE: Save the merged state back to server
           await saveDataToServer();
-          
-          alert("Jawaban BERHASIL terkirim ke server! Anda boleh menutup halaman ini.");
+          alert("Jawaban BERHASIL terkirim ke server!");
       } catch (e) {
-          console.error("Submission Error:", e);
-          alert("Gagal sinkronisasi otomatis. JANGAN TUTUP HALAMAN. Data tersimpan di browser, silakan coba tekan tombol Sync/Refresh nanti.");
+          alert("Gagal sinkronisasi otomatis. Data tersimpan di browser, silakan coba tekan tombol Sync/Refresh nanti.");
       } finally {
           setIsSyncing(false);
       }
@@ -445,24 +334,27 @@ const App = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
+    const currentAdminPass = schoolSettings.adminPassword || DEFAULT_SETTINGS.adminPassword;
+    const currentLitPass = schoolSettings.teacherLiterasiPassword || DEFAULT_SETTINGS.teacherLiterasiPassword;
+    const currentNumPass = schoolSettings.teacherNumerasiPassword || DEFAULT_SETTINGS.teacherNumerasiPassword;
 
     if (loginRole === Role.ADMIN) {
       if (selectedAdminUser === 'admin') {
-        if (adminPass === schoolSettings.adminPassword) {
+        if (adminPass === currentAdminPass) {
            setSession({ role: Role.ADMIN, name: 'Administrator', id: 'admin' });
            setActiveTab('dashboard');
         } else {
            setLoginError('Password Admin Salah');
         }
       } else if (selectedAdminUser === 'guru_numerasi') {
-         if (adminPass === (schoolSettings.teacherNumerasiPassword || 'guru123')) { 
+         if (adminPass === currentNumPass) { 
            setSession({ role: Role.TEACHER_NUMERASI, name: 'Guru Numerasi', id: 'guru_num' });
            setActiveTab('questions'); 
         } else {
            setLoginError('Password Guru Numerasi Salah');
         }
       } else if (selectedAdminUser === 'guru_literasi') {
-         if (adminPass === (schoolSettings.teacherLiterasiPassword || 'guru123')) {
+         if (adminPass === currentLitPass) {
            setSession({ role: Role.TEACHER_LITERASI, name: 'Guru Literasi', id: 'guru_lit' });
            setActiveTab('questions');
         } else {
@@ -496,109 +388,159 @@ const App = () => {
     setLoginError('');
   };
 
-  // --- Login View ---
+  // --- Login View (Free Fire Light Theme) ---
   if (!session) {
     const studentsInClass = students.filter(s => s.class === selectedClass);
+    const isStudent = loginRole === Role.STUDENT;
 
     return (
-      <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center p-4 bg-slate-950 overflow-hidden font-sans text-white">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center opacity-30 pointer-events-none"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black pointer-events-none"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-600/10 via-slate-900/50 to-black pointer-events-none"></div>
-
-        <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-50">
+      <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-[#F2F4F8] overflow-hidden font-sans text-slate-800">
+        
+        {/* Tactical Background Elements */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(226,232,240,0.4)_1px,transparent_1px),linear-gradient(90deg,rgba(226,232,240,0.4)_1px,transparent_1px)] bg-[size:40px_40px] z-0 pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-yellow-200/30 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-200/30 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
+        
+        {/* Status Indicators */}
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
             {isSyncing ? (
-                <div className="bg-blue-900/50 text-blue-300 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/30 flex items-center gap-2 shadow-lg">
-                    <RefreshCw size={12} className="animate-spin"/> Syncing...
+                <div className="bg-white/80 backdrop-blur border border-blue-200 text-blue-600 px-4 py-2 text-xs font-black uppercase tracking-widest skew-x-[-12deg] flex items-center gap-2 shadow-sm">
+                    <div className="skew-x-[12deg] flex items-center gap-2"><RefreshCw size={12} className="animate-spin"/> Syncing</div>
                 </div>
             ) : isConnected ? (
-                <div className="bg-green-900/50 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30 flex items-center gap-2 shadow-lg">
-                    <Cloud size={12}/> Online
+                <div className="bg-white/80 backdrop-blur border border-green-200 text-green-600 px-4 py-2 text-xs font-black uppercase tracking-widest skew-x-[-12deg] flex items-center gap-2 shadow-sm">
+                    <div className="skew-x-[12deg] flex items-center gap-2"><Cloud size={12}/> Online</div>
                 </div>
             ) : (
-                <div className="bg-red-900/50 text-red-300 px-3 py-1 rounded-full text-xs font-bold border border-red-500/30 flex items-center gap-2 shadow-lg">
-                   <CloudOff size={12}/> Offline
+                <div className="bg-white/80 backdrop-blur border border-red-200 text-red-600 px-4 py-2 text-xs font-black uppercase tracking-widest skew-x-[-12deg] flex items-center gap-2 shadow-sm">
+                   <div className="skew-x-[12deg] flex items-center gap-2"><CloudOff size={12}/> Offline</div>
                 </div>
             )}
         </div>
 
-        <div className="relative z-10 w-full max-w-md">
-          <div className="text-center mb-8 relative">
-             <div className="mb-6 flex justify-center">
-                <div className="relative w-20 h-20 flex items-center justify-center bg-black/60 border-2 border-yellow-500/50 rounded-xl transform rotate-3 shadow-[0_0_15px_rgba(234,179,8,0.3)]">
-                     <div className="absolute inset-0 border border-white/20 rounded-xl"></div>
-                     <img src="https://image2url.com/r2/default/images/1769001049680-d981c280-6340-4989-8563-7b08134c189a.png" alt="Logo" className="h-12 w-12 object-contain drop-shadow-md transform -rotate-3" />
+        <div className="relative z-10 w-full max-w-md p-4">
+          {/* Logo Section */}
+          <div className="text-center mb-10 relative">
+             <div className="relative inline-block group">
+                <div className="absolute inset-0 bg-yellow-400 rotate-[10deg] rounded-3xl blur-md opacity-40 group-hover:rotate-[20deg] transition-transform duration-500"></div>
+                <div className="w-28 h-28 flex items-center justify-center bg-white border-4 border-yellow-500 relative z-10 shadow-xl transform rotate-[10deg] group-hover:rotate-0 transition-transform duration-300 rounded-[2rem]">
+                     <div className="transform -rotate-[10deg] group-hover:rotate-0 transition-transform duration-300">
+                        <img src="https://image2url.com/r2/default/images/1769001049680-d981c280-6340-4989-8563-7b08134c189a.png" alt="Logo" className="h-16 w-16 object-contain" />
+                     </div>
                 </div>
              </div>
-             <div className="inline-block bg-yellow-500 text-black px-6 py-2 transform -skew-x-12 border-2 border-white/20 shadow-[0_0_20px_rgba(234,179,8,0.5)]">
-                <h1 className="text-2xl font-black italic tracking-tighter transform skew-x-12 uppercase">{schoolSettings?.cbtTitle || 'CBT BATTLE'}</h1>
+             <div className="mt-8">
+                 <h1 className="text-5xl font-black italic tracking-tighter text-slate-800 uppercase drop-shadow-sm leading-none">
+                    {schoolSettings?.cbtTitle || 'BATTLE ARENA'}
+                 </h1>
+                 <div className="flex items-center justify-center gap-2 mt-2">
+                    <div className="h-1 w-8 bg-yellow-500 skew-x-[-20deg]"></div>
+                    <p className="text-slate-500 text-sm font-black uppercase tracking-[0.3em]">{schoolSettings.schoolName}</p>
+                    <div className="h-1 w-8 bg-yellow-500 skew-x-[-20deg]"></div>
+                 </div>
              </div>
-             <p className="mt-3 text-slate-400 text-sm font-mono tracking-[0.3em] uppercase">{schoolSettings.schoolName}</p>
           </div>
 
-          <div 
-            className="bg-black/60 backdrop-blur-xl border border-white/10 p-1 relative"
-            style={{ clipPath: 'polygon(5% 0, 100% 0, 100% 95%, 95% 100%, 0 100%, 0 5%)' }}
-          >
-            <div className="bg-slate-900/80 p-8 border-l-4 border-yellow-500 h-full">
-              <div className="flex bg-black/50 p-1 mb-6 border border-white/10">
-                 <button onClick={() => { setLoginRole(Role.STUDENT); setLoginError(''); }} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${loginRole === Role.STUDENT ? 'bg-yellow-500 text-black' : 'text-slate-500 hover:text-white'}`}>Siswa</button>
-                 <button onClick={() => { setLoginRole(Role.ADMIN); setLoginError(''); }} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${loginRole === Role.ADMIN ? 'bg-yellow-500 text-black' : 'text-slate-500 hover:text-white'}`}>Admin / Guru</button>
+          {/* Login Card */}
+          <div className="bg-white/90 backdrop-blur-sm p-1 shadow-2xl relative">
+            {/* Decorative Corners */}
+            <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-yellow-500 z-20"></div>
+            <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-yellow-500 z-20"></div>
+            <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-yellow-500 z-20"></div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-yellow-500 z-20"></div>
+
+            <div className="bg-white p-8 border border-slate-200 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400"></div>
+              
+              {/* Role Toggle */}
+              <div className="flex gap-2 mb-8">
+                 <button onClick={() => { setLoginRole(Role.STUDENT); setLoginError(''); }} className={`flex-1 h-12 skew-x-[-12deg] transition-all duration-300 border-2 flex items-center justify-center group ${isStudent ? 'bg-yellow-500 border-yellow-500 text-white shadow-lg shadow-yellow-200' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-yellow-300'}`}>
+                    <div className="skew-x-[12deg] font-black uppercase tracking-widest text-sm flex items-center gap-2">
+                        <Target size={16} className={isStudent ? "animate-pulse" : ""}/> SISWA
+                    </div>
+                 </button>
+                 <button onClick={() => { setLoginRole(Role.ADMIN); setLoginError(''); }} className={`flex-1 h-12 skew-x-[-12deg] transition-all duration-300 border-2 flex items-center justify-center group ${!isStudent ? 'bg-slate-800 border-slate-800 text-white shadow-lg' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-400'}`}>
+                    <div className="skew-x-[12deg] font-black uppercase tracking-widest text-sm flex items-center gap-2">
+                        <Shield size={16} /> GURU
+                    </div>
+                 </button>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-5">
-                {loginRole === Role.ADMIN ? (
+              <form onSubmit={handleLogin} className="space-y-6 relative z-10">
+                {!isStudent ? (
+                  /* Admin Inputs */
                   <>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Login Sebagai</label>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1"><User size={12}/> Access Level</label>
                       <div className="relative group">
-                        <select className="w-full bg-black/50 border border-slate-700 text-white text-sm py-3 pl-4 pr-10 focus:outline-none focus:border-yellow-500 font-mono appearance-none" value={selectedAdminUser} onChange={(e) => setSelectedAdminUser(e.target.value)}>
+                        <select className="w-full bg-slate-50 border-2 border-slate-200 text-slate-700 text-sm py-3 px-4 focus:outline-none focus:border-slate-800 font-bold appearance-none transition-all uppercase rounded-none" value={selectedAdminUser} onChange={(e) => setSelectedAdminUser(e.target.value)}>
                             <option value="admin">Admin Utama</option>
                             <option value="guru_literasi">Guru Literasi</option>
                             <option value="guru_numerasi">Guru Numerasi</option>
                         </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16}/>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18}/>
+                        <div className="absolute bottom-0 left-0 w-0 h-[2px] bg-slate-800 transition-all duration-300 group-hover:w-full"></div>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Password</label>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1"><Lock size={12}/> Security Code</label>
                       <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-yellow-500"><Lock size={16} /></div>
-                        <input type="password" className="w-full bg-black/50 border border-slate-700 text-white text-sm py-3 pl-10 pr-4 focus:outline-none focus:border-yellow-500 transition-colors font-mono" placeholder="Masukkan Password" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} />
+                        <input type="password" className="w-full bg-slate-50 border-2 border-slate-200 text-slate-700 text-sm py-3 px-4 focus:outline-none focus:border-slate-800 transition-colors font-bold uppercase rounded-none" placeholder="ENTER PASSWORD" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} />
+                        <div className="absolute bottom-0 left-0 w-0 h-[2px] bg-slate-800 transition-all duration-300 group-hover:w-full"></div>
                       </div>
                     </div>
                   </>
                 ) : (
+                  /* Student Inputs */
                   <>
-                     <div className="space-y-1">
-                        <label className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Pilih Kelas</label>
-                        <div className="relative">
-                          <select className="w-full bg-black/50 border border-slate-700 text-white text-sm py-3 pl-4 pr-10 focus:outline-none focus:border-yellow-500 appearance-none font-mono cursor-pointer" value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setSelectedStudentId(''); }}>
-                            <option value="" className="bg-slate-900 text-slate-500">-- PILIH KELAS --</option>
-                            {CLASS_LIST.map((cls) => (<option key={cls} value={cls} className="bg-slate-900">{cls}</option>))}
+                     <div className="space-y-2">
+                        <label className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1"><Shield size={12}/> Class Selection</label>
+                        <div className="relative group">
+                          <select className="w-full bg-slate-50 border-2 border-slate-200 text-slate-700 text-sm py-3 px-4 focus:outline-none focus:border-yellow-500 appearance-none font-bold cursor-pointer transition-all uppercase rounded-none" value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setSelectedStudentId(''); }}>
+                            <option value="">-- SELECT CLASS --</option>
+                            {CLASS_LIST.map((cls) => (<option key={cls} value={cls}>{cls}</option>))}
                           </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16}/>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18}/>
+                          <div className="absolute bottom-0 left-0 w-0 h-[2px] bg-yellow-500 transition-all duration-300 group-hover:w-full"></div>
                         </div>
                      </div>
-                     <div className="space-y-1">
-                        <label className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Nama Siswa</label>
-                        <div className="relative">
-                          <select className="w-full bg-black/50 border border-slate-700 text-white text-sm py-3 pl-4 pr-10 focus:outline-none focus:border-yellow-500 appearance-none font-mono cursor-pointer disabled:opacity-50" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)} disabled={!selectedClass}>
-                            <option value="" className="bg-slate-900 text-slate-500">-- PILIH NAMA --</option>
-                            {studentsInClass.map((s) => (<option key={s.id} value={s.id} className="bg-slate-900">{s.name} ({s.nis})</option>))}
+                     <div className="space-y-2">
+                        <label className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1"><User size={12}/> Operator Name</label>
+                        <div className="relative group">
+                          <select className="w-full bg-slate-50 border-2 border-slate-200 text-slate-700 text-sm py-3 px-4 focus:outline-none focus:border-yellow-500 appearance-none font-bold cursor-pointer disabled:opacity-50 transition-all uppercase rounded-none" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)} disabled={!selectedClass}>
+                            <option value="">-- SELECT IDENTITY --</option>
+                            {studentsInClass.map((s) => (<option key={s.id} value={s.id}>{s.name} ({s.nis})</option>))}
                           </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16}/>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18}/>
+                          <div className="absolute bottom-0 left-0 w-0 h-[2px] bg-yellow-500 transition-all duration-300 group-hover:w-full"></div>
                         </div>
                      </div>
                   </>
                 )}
-                {loginError && (<div className="bg-red-500/10 border-l-2 border-red-500 p-2"><p className="text-red-500 text-xs font-mono flex items-center gap-2"><AlertTriangle size={12} /> {loginError}</p></div>)}
-                <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-widest py-4 mt-4 transition-all group relative overflow-hidden">
-                  <span className="relative z-10 flex items-center justify-center gap-2">{loginRole === Role.ADMIN ? 'MASUK SISTEM' : 'MULAI UJIAN'} <ChevronRight size={18} className="animate-pulse"/></span>
+                
+                {loginError && (
+                    <div className="bg-red-50 border-l-4 border-red-500 p-3 animate-bounce-in">
+                        <p className="text-red-500 text-xs font-black flex items-center gap-2 uppercase tracking-wide"><AlertTriangle size={14} /> {loginError}</p>
+                    </div>
+                )}
+                
+                <button type="submit" className={`w-full text-white font-black text-lg uppercase tracking-[0.2em] py-4 mt-6 transition-all shadow-lg skew-x-[-12deg] group relative overflow-hidden active:scale-[0.98] ${!isStudent ? 'bg-slate-800 hover:bg-slate-700 border-b-4 border-slate-950' : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 border-b-4 border-orange-700 shadow-orange-200'}`}>
+                  <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+                  <span className="skew-x-[12deg] flex justify-center items-center gap-3">
+                    {loginRole === Role.ADMIN ? (
+                        <>ADMIN ACCESS <Lock size={18} /></>
+                    ) : (
+                        <>START MISSION <ChevronRight size={20} strokeWidth={3}/></>
+                    )}
+                  </span>
                 </button>
               </form>
             </div>
           </div>
+          
+          <p className="text-center text-slate-400 text-[10px] font-bold mt-8 uppercase tracking-widest opacity-60">
+              Secured by CBT Battle System v4.0
+          </p>
         </div>
       </div>
     );
@@ -606,13 +548,11 @@ const App = () => {
 
   // --- Main App View (Authenticated) ---
   return (
-    <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-950 text-white font-sans overflow-hidden">
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center opacity-20 pointer-events-none"></div>
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/90 via-slate-900/80 to-black/95 pointer-events-none"></div>
-
+    <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-[#F2F4F8] text-slate-800 font-sans overflow-hidden">
+      
       <div className="flex w-full h-full relative z-10 overflow-hidden">
         {session.role !== Role.STUDENT && (
-          <div className="flex-none z-20 h-full border-r border-white/10">
+          <div className="flex-none z-20 h-full border-r border-slate-200 bg-white shadow-xl">
              <Sidebar user={session} activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
           </div>
         )}
@@ -622,11 +562,11 @@ const App = () => {
             {session.role !== Role.STUDENT && (
                 <div className="absolute top-4 right-8 z-50 flex items-center gap-2">
                     {isSyncing ? (
-                        <div className="bg-blue-600 px-3 py-1 rounded text-xs font-bold text-white shadow-lg animate-pulse flex items-center gap-2">
+                        <div className="bg-blue-100 px-3 py-1 rounded-full text-xs font-bold text-blue-600 shadow border border-blue-200 flex items-center gap-2">
                             <RefreshCw size={12} className="animate-spin"/> Syncing...
                         </div>
                     ) : (
-                        <button onClick={saveDataToServer} className="bg-slate-800 hover:bg-green-600 px-3 py-1 rounded text-xs font-bold text-slate-300 hover:text-white border border-slate-600 shadow-lg flex items-center gap-2 transition-all">
+                        <button onClick={saveDataToServer} className="bg-white hover:bg-slate-50 px-3 py-1 rounded-full text-xs font-bold text-slate-500 hover:text-[#00A2FF] border border-slate-200 shadow flex items-center gap-2 transition-all">
                             <Cloud size={14}/> {isConnected ? 'Data Synced' : 'Sync to Server'}
                         </button>
                     )}
@@ -652,7 +592,6 @@ const App = () => {
                     setSchoolSettings={setSchoolSettings}
                     examResults={examResults} 
                     onSyncData={() => {
-                        // FORCE UPDATE REF before sync to ensure fresh data
                         stateRef.current = { students, questions, exams, packets, examResults, schoolSettings };
                         setTimeout(saveDataToServer, 500); 
                     }}

@@ -3,46 +3,80 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>CBT SMPN 3 Pacet</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <!-- KaTeX CSS for Math Rendering -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
     <style>
       body { 
         font-family: 'Inter', sans-serif; 
-        /* Fresh Sunny/Blue Sky Background */
-        background-image: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=2670&auto=format&fit=crop'); 
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
+        /* Roblox-style Light Gray Background with subtle grid */
+        background-color: #F2F4F8;
+        background-image: 
+          linear-gradient(#E2E8F0 1px, transparent 1px),
+          linear-gradient(90deg, #E2E8F0 1px, transparent 1px);
+        background-size: 40px 40px;
+        color: #1E293B;
+        margin: 0;
         overflow: hidden; 
       }
-      /* Custom Scrollbar */
+      
+      /* Playful Font for Headers */
+      h1, h2, h3, .font-display {
+        font-family: 'Fredoka', 'Inter', sans-serif;
+      }
+
+      /* Custom Scrollbar - Thicker & Rounder */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 12px;
+        height: 12px;
       }
       ::-webkit-scrollbar-track {
-        background: transparent;
+        background: rgba(0,0,0,0.05);
       }
       ::-webkit-scrollbar-thumb {
-        background: rgba(0,0,0,0.2);
-        border-radius: 10px;
+        background: #CBD5E1;
+        border-radius: 99px;
+        border: 3px solid transparent;
+        background-clip: content-box;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: rgba(0,0,0,0.4);
+        background: #94A3B8;
+        border: 3px solid transparent;
+        background-clip: content-box;
       }
       
       /* Math & Markdown Styles */
-      .prose p { margin-bottom: 0.5em; }
-      .prose ul { list-style-type: disc; padding-left: 1.5em; }
-      .prose ol { list-style-type: decimal; padding-left: 1.5em; }
-      .katex { font-size: 1.1em; }
+      .prose p { margin-bottom: 0.5em; color: #334155; }
+      .prose ul { list-style-type: disc; padding-left: 1.5em; color: #334155; }
+      .prose ol { list-style-type: decimal; padding-left: 1.5em; color: #334155; }
+      .katex { font-size: 1.1em; color: #0f172a; }
+
+      /* Roblox 3D Button Effect Class */
+      .btn-3d {
+        transition: all 0.1s;
+        transform: translateY(0);
+        border-bottom-width: 4px;
+      }
+      .btn-3d:active {
+        transform: translateY(2px);
+        border-bottom-width: 2px;
+        margin-top: 2px;
+        box-shadow: none;
+      }
+      
+      /* Card Pop Effect */
+      .card-pop {
+        background: white;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 0 0 #E2E8F0;
+        border-radius: 1rem;
+      }
     </style>
     <script>
-      // Polyfill for process.env to prevent runtime errors in browser environments
+      // Polyfill for process.env
       window.process = { env: { API_KEY: '' } };
     </script>
   <script type="importmap">

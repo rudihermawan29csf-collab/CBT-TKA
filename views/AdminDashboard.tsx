@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Student, Teacher, Question, QuestionType, QuestionCategory, QuestionPacket, Exam, Role, SchoolSettings, ExamResult } from '../types';
-import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX, Sigma, Calculator, Divide, X as MultiplyIcon, Link, RefreshCcw } from 'lucide-react';
+import { Upload, Download, Trash2, Search, Brain, Save, Settings, Plus, X, List, Layout, FileSpreadsheet, Check, Eye, ChevronLeft, ChevronRight, HelpCircle, Edit2, ImageIcon, Users, UserPlus, BarChart2, TrendingUp, AlertTriangle, Table, PieChart, Layers, FileText, ArrowRight, CalendarClock, PlayCircle, StopCircle, Clock, Activity, RefreshCw, BookOpen, GraduationCap, AlignLeft, Image as LucideImage, AlertOctagon, ShieldAlert, Filter, Smartphone, FileImage, UserX, Sigma, Calculator, Divide, X as MultiplyIcon, Link, RefreshCcw, Key } from 'lucide-react';
 import { CLASS_LIST } from '../constants';
 import * as XLSX from 'xlsx';
 import ReactMarkdown from 'react-markdown';
@@ -38,8 +38,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentFileRef = useRef<HTMLInputElement>(null);
-  const questionFileRef = useRef<HTMLInputElement>(null); // New ref for Question Import
-  const imageUploadRef = useRef<HTMLInputElement>(null); // For Question Image
+  const questionFileRef = useRef<HTMLInputElement>(null);
+  const imageUploadRef = useRef<HTMLInputElement>(null);
   
   // --- Student Management State ---
   const [selectedClassFilter, setSelectedClassFilter] = useState(''); 
@@ -75,18 +75,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [matchingPairs, setMatchingPairs] = useState<{left: string, right: string}[]>([{left: '', right: ''}]);
 
   // --- MATH TOOLBAR STATE ---
-  // Tracks which input field was last focused so we know where to insert the math formula
   const [lastFocusedField, setLastFocusedField] = useState<{
       name: 'stimulus' | 'question' | 'option' | 'pair-left' | 'pair-right';
-      index?: number; // For arrays like options or pairs
+      index?: number; 
       cursorPos?: number;
   } | null>(null);
 
   // --- Exam Management State ---
   const [newExamTitle, setNewExamTitle] = useState('');
-  const [newExamCategory, setNewExamCategory] = useState<QuestionCategory>(QuestionCategory.LITERASI); // NEW: Category Filter for Exam Creation
+  const [newExamCategory, setNewExamCategory] = useState<QuestionCategory>(QuestionCategory.LITERASI); 
   const [newExamPacketId, setNewExamPacketId] = useState('');
-  const [newExamDuration, setNewExamDuration] = useState(60);
+  const [newExamDuration, setNewExamDuration] = useState(120); // Default 120 minutes as requested
   const [newExamClasses, setNewExamClasses] = useState<string[]>([]);
   const [newExamStart, setNewExamStart] = useState('');
   const [newExamEnd, setNewExamEnd] = useState('');
@@ -99,7 +98,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- Analysis State ---
   const [analysisSubTab, setAnalysisSubTab] = useState<'item' | 'recap' | 'missing'>('item');
   const [selectedExamIdForAnalysis, setSelectedExamIdForAnalysis] = useState<string>('');
-  const [analysisClassFilter, setAnalysisClassFilter] = useState<string>('');
 
   // --- MEMOIZED FILTERS (ROLE BASED) ---
   const visiblePackets = useMemo(() => {
@@ -135,29 +133,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [userRole]);
 
   // --- HELPER FUNCTIONS ---
-  
-  // Word/HTML Cleanup Helper
   const cleanWordHtml = (html: string) => {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     return tempDiv.textContent || tempDiv.innerText || "";
   };
 
-  // --- MATH INSERTION LOGIC ---
   const handleInsertMath = (latex: string) => {
       if (!lastFocusedField) {
-          // If no field is focused, default to Question Text
           setNewQuestionText(prev => prev + latex);
           return;
       }
-
       const { name, index } = lastFocusedField;
-
-      if (name === 'stimulus') {
-          setNewStimulus(prev => prev + latex);
-      } else if (name === 'question') {
-          setNewQuestionText(prev => prev + latex);
-      } else if (name === 'option' && typeof index === 'number') {
+      if (name === 'stimulus') setNewStimulus(prev => prev + latex);
+      else if (name === 'question') setNewQuestionText(prev => prev + latex);
+      else if (name === 'option' && typeof index === 'number') {
           const updated = [...newOptions];
           updated[index] = (updated[index] || '') + latex;
           setNewOptions(updated);
@@ -165,8 +155,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           const updated = [...matchingPairs];
           updated[index].left = (updated[index].left || '') + latex;
           setMatchingPairs(updated);
-      } else if (name === 'pair-right' && typeof index === 'number') {
-          // pair-right is usually a dropdown, but keeping logic just in case we change it to text later
       }
   };
   
@@ -200,7 +188,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return `${s.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})} s.d ${e.toLocaleString('id-ID', {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}`;
   };
 
-  // Handle Image Upload (UPDATED TO USE IMMEDIATE SERVER UPLOAD)
+  // Handle Image Upload
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -211,11 +199,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   const canvas = document.createElement('canvas');
                   let width = img.width;
                   let height = img.height;
-                  
-                  // Reduced size for better reliability (600px is safer for base64 fallback)
-                  // CHANGED: Reduced from 800 to 600
                   const MAX_SIZE = 600; 
-
                   if (width > height) {
                       if (width > MAX_SIZE) {
                           height *= MAX_SIZE / width;
@@ -234,11 +218,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       ctx.fillStyle = "#FFFFFF";
                       ctx.fillRect(0, 0, width, height);
                       ctx.drawImage(img, 0, 0, width, height);
-                      
-                      // CHANGED: Reduced quality from 0.8 to 0.6
                       const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                       
-                      // UPLOAD PROCESS
                       if (onUploadImage) {
                           setIsImageUploading(true);
                           try {
@@ -247,42 +228,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               setNewQuestionImage(driveUrl);
                               alert("Gambar berhasil diupload ke Google Drive!");
                           } catch (error: any) {
-                              console.error("Upload failed", error);
-                              
-                              // DETAILED ERROR ANALYSIS
-                              const errString = error.message || error.toString();
-                              // Check for common permission error keywords in both English and Indonesian
-                              const isPermissionError = errString.includes("DriveApp") || 
-                                                        errString.includes("izin") || 
-                                                        errString.includes("permission") || 
-                                                        errString.includes("Exception");
-
-                              let message = "⚠️ GAGAL UPLOAD KE SERVER\n\n";
-                              
-                              if (isPermissionError) {
-                                  message += "MASALAH IZIN (SERVER): Script Google Anda belum memiliki izin akses Drive (DriveApp).\n\n";
-                                  message += "SOLUSI ADMIN: Buka Google Apps Script Editor, jalankan fungsi 'setup()' atau 'doPost()' secara manual sekali untuk memicu popup izin akses.\n\n";
-                              } else {
-                                  message += "Penyebab: " + errString + "\n\n";
-                              }
-                              
-                              message += "Apakah Anda ingin menggunakan gambar ini secara LOKAL (Offline Mode)?\n";
-                              message += "Klik OK untuk tetap menyimpan gambar (tanpa link Google Drive).";
-
-                              // FALLBACK LOGIC: Ask user if they want to use local Base64
-                              const useOffline = confirm(message);
-
+                              const useOffline = confirm("Gagal upload ke Server (Izin DriveApp/Error).\n\nGunakan gambar dalam mode offline (Lokal)?");
                               if (useOffline) {
-                                  setNewQuestionImage(dataUrl); // Use the base64 string
+                                  setNewQuestionImage(dataUrl); 
                               } else {
-                                  setNewQuestionImage(''); // Clear if user cancels
+                                  setNewQuestionImage(''); 
                               }
                           } finally {
                               setIsImageUploading(false);
                               if (imageUploadRef.current) imageUploadRef.current.value = '';
                           }
                       } else {
-                          // Legacy fallback if no handler provided
                           setNewQuestionImage(dataUrl);
                       }
                   }
@@ -299,7 +255,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       ["Siapa presiden pertama RI?", "Soekarno", "Hatta", "Syahrir", "Sudirman", "A"],
       ["Siapa proklamator?", "Hatta", "Soekarno", "Yamin", "Supomo", "B"]
     ];
-
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template Soal");
@@ -309,26 +264,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleImportQuestions = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const data = event.target?.result;
       const workbook = XLSX.read(data, { type: 'binary' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      // Skip header row
       const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }).slice(1) as any[][];
-
       const packet = packets.find(p => p.id === selectedPacketId);
       const packetCategory = packet ? packet.category : QuestionCategory.LITERASI;
-
       const imported: Question[] = rows
-        .filter(row => row[0]) // Ensure question text exists
+        .filter(row => row[0])
         .map((row, idx) => {
           const text = row[0];
           const opts = [row[1], row[2], row[3], row[4]];
           const keyRaw = row[5];
-          
           let correctIndex = 0;
           if (keyRaw && typeof keyRaw === 'string') {
              const k = keyRaw.trim().toUpperCase();
@@ -337,7 +287,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
              else if (k === 'C') correctIndex = 2;
              else if (k === 'D') correctIndex = 3;
           }
-
           return {
             id: `imp-q-${Date.now()}-${idx}`,
             packetId: selectedPacketId || undefined,
@@ -356,20 +305,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if(questionFileRef.current) questionFileRef.current.value = '';
   };
 
-  // --- HANDLERS ---
   const handleCreateExam = () => {
     if (!newExamTitle || !newExamPacketId || !newExamStart || !newExamEnd || newExamClasses.length === 0) { alert("Lengkapi data ujian."); return; }
-    
-    // VALIDASI: Hanya ambil soal sesuai jumlah "Total Soal" pada paket
     const packet = packets.find(p => p.id === newExamPacketId);
     const maxQuestions = packet ? packet.totalQuestions : 999;
-    
     const pktQuestions = questions
-        .filter(q => q.packetId === newExamPacketId && (q.number || 0) <= maxQuestions) // Pastikan tidak ada soal hantu (misal nomor 11 jika total 10)
-        .sort((a, b) => (a.number || 0) - (b.number || 0)); // Urutkan berdasarkan nomor soal
-
+        .filter(q => q.packetId === newExamPacketId && (q.number || 0) <= maxQuestions)
+        .sort((a, b) => (a.number || 0) - (b.number || 0));
     if (pktQuestions.length === 0) { alert("Paket soal kosong."); return; }
-    
     const newExam: Exam = { id: `exam-${Date.now()}`, title: newExamTitle, packetId: newExamPacketId, durationMinutes: newExamDuration, classTarget: newExamClasses, scheduledStart: newExamStart, scheduledEnd: newExamEnd, questions: pktQuestions, isActive: true };
     if (setExams) setExams([...exams, newExam]);
     alert("Ujian dijadwalkan!"); setNewExamTitle(''); setNewExamPacketId(''); setNewExamClasses([]); setNewExamStart(''); setNewExamEnd(''); triggerSync();
@@ -378,7 +321,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteExam = (id: string) => { if (confirm('Hapus jadwal?')) { if (setExams) setExams(exams.filter(e => e.id !== id)); triggerSync(); } };
   const toggleExamStatus = (id: string) => { if (setExams) setExams(exams.map(e => e.id === id ? { ...e, isActive: !e.isActive } : e)); triggerSync(); };
   
-  // Student Handlers
   const handleAddStudent = () => { if (!newStudent.name || !newStudent.class || !newStudent.nis) return; setStudents([...students, { id: `s-${Date.now()}`, no: students.length + 1, ...newStudent }]); setNewStudent({ name: '', class: '', nis: '', nisn: '' }); alert("Siswa ditambahkan!"); setShowAddStudentModal(false); triggerSync(); };
   const handleDeleteStudent = (id: string) => { if(confirm('Hapus siswa?')) { setStudents(students.filter(s => s.id !== id)); triggerSync(); } };
   
@@ -431,41 +373,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           category: packets.find(p => p.id === selectedPacketId)?.category 
       };
 
-      // Handle Stimulus
-      if (stimulusType === 'text') {
-          qData.stimulus = newStimulus;
-          qData.image = '';
-      } else {
-          qData.stimulus = '';
-          qData.image = newQuestionImage; // This will now be a URL if updated
-      }
+      if (stimulusType === 'text') { qData.stimulus = newStimulus; qData.image = ''; } 
+      else { qData.stimulus = ''; qData.image = newQuestionImage; }
 
-      // Handle Answers based on Type
-      if (manualType === QuestionType.SINGLE) { 
-          qData.options = newOptions; 
-          qData.correctAnswerIndex = singleCorrectIndex; 
-      }
-      else if (manualType === QuestionType.COMPLEX) { 
-          qData.options = newOptions; 
-          qData.correctAnswerIndices = complexCorrectIndices; 
-      }
-      else if (manualType === QuestionType.MATCHING) { 
-          // New Logic for Matching: options contain [Label1, Label2], matchingPairs contains {left: statement, right: answer}
-          qData.options = [newOptions[0] || 'Benar', newOptions[1] || 'Salah']; 
-          qData.matchingPairs = matchingPairs.filter(p => p.left); 
-      }
+      if (manualType === QuestionType.SINGLE) { qData.options = newOptions; qData.correctAnswerIndex = singleCorrectIndex; }
+      else if (manualType === QuestionType.COMPLEX) { qData.options = newOptions; qData.correctAnswerIndices = complexCorrectIndices; }
+      else if (manualType === QuestionType.MATCHING) { qData.options = [newOptions[0] || 'Benar', newOptions[1] || 'Salah']; qData.matchingPairs = matchingPairs.filter(p => p.left); }
 
-      // STRICT ID/SLOT CHECK: Find if question already exists for this slot to avoid duplicates
       const existingQIndex = questions.findIndex(q => q.packetId === selectedPacketId && q.number === activeSlot);
       let newQuestions = [...questions];
       
       if (existingQIndex >= 0) {
-          // Update Existing Question
           const existingId = newQuestions[existingQIndex].id;
           newQuestions[existingQIndex] = { ...newQuestions[existingQIndex], ...qData };
           setEditingQuestionId(existingId); 
       } else {
-          // Create New Question
           const newId = `q-${Date.now()}`;
           newQuestions.push({ ...qData, id: newId } as Question);
           setEditingQuestionId(newId); 
@@ -475,7 +397,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setPackets(prev => prev.map(p => p.id === selectedPacketId ? { ...p, questionTypes: { ...p.questionTypes, [activeSlot]: manualType } } : p));
       
       alert(`Soal No. ${activeSlot} tersimpan. Sinkronisasi dimulai...`); 
-      triggerSync(); // Trigger sync
+      triggerSync(); 
   };
 
   const prepareSlotForm = (num: number) => {
@@ -484,64 +406,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const pkt = packets.find(p => p.id === selectedPacketId);
       const type = pkt?.questionTypes[num] || QuestionType.SINGLE;
       setManualType(type);
-      setLastFocusedField(null); // Reset focus
+      setLastFocusedField(null); 
       setIsImageUploading(false);
       
       if (existingQ) {
           setEditingQuestionId(existingQ.id); 
           setNewQuestionText(existingQ.text);
-          
-          if (existingQ.image) {
-              setStimulusType('image');
-              setNewQuestionImage(existingQ.image);
-              setNewStimulus('');
-          } else {
-              setStimulusType('text');
-              setNewStimulus(existingQ.stimulus || '');
-              setNewQuestionImage('');
-          }
+          if (existingQ.image) { setStimulusType('image'); setNewQuestionImage(existingQ.image); setNewStimulus(''); } 
+          else { setStimulusType('text'); setNewStimulus(existingQ.stimulus || ''); setNewQuestionImage(''); }
 
-          // Strict State Reset based on loaded type
-          if (existingQ.type === QuestionType.SINGLE) { 
-              setNewOptions(existingQ.options || ['', '', '', '']); 
-              setSingleCorrectIndex(existingQ.correctAnswerIndex || 0);
-              
-              // Reset others
-              setComplexCorrectIndices([]);
-              setMatchingPairs([{left:'', right: ''}]);
-          }
-          else if (existingQ.type === QuestionType.COMPLEX) { 
-              setNewOptions(existingQ.options || ['', '', '', '']); 
-              setComplexCorrectIndices(existingQ.correctAnswerIndices || []);
-              
-              // Reset others
-              setSingleCorrectIndex(0);
-              setMatchingPairs([{left:'', right: ''}]);
-          }
-          else if (existingQ.type === QuestionType.MATCHING) {
-              const opts = existingQ.options && existingQ.options.length >= 2 ? existingQ.options : ['Benar', 'Salah', '', ''];
-              setNewOptions(opts);
-              setMatchingPairs(existingQ.matchingPairs || [{left:'', right: opts[0]}]);
-              
-              // Reset others
-              setSingleCorrectIndex(0);
-              setComplexCorrectIndices([]);
-          }
+          if (existingQ.type === QuestionType.SINGLE) { setNewOptions(existingQ.options || ['', '', '', '']); setSingleCorrectIndex(existingQ.correctAnswerIndex || 0); setComplexCorrectIndices([]); setMatchingPairs([{left:'', right: ''}]); }
+          else if (existingQ.type === QuestionType.COMPLEX) { setNewOptions(existingQ.options || ['', '', '', '']); setComplexCorrectIndices(existingQ.correctAnswerIndices || []); setSingleCorrectIndex(0); setMatchingPairs([{left:'', right: ''}]); }
+          else if (existingQ.type === QuestionType.MATCHING) { const opts = existingQ.options && existingQ.options.length >= 2 ? existingQ.options : ['Benar', 'Salah', '', '']; setNewOptions(opts); setMatchingPairs(existingQ.matchingPairs || [{left:'', right: opts[0]}]); setSingleCorrectIndex(0); setComplexCorrectIndices([]); }
       } else {
-          setEditingQuestionId(null); 
-          setStimulusType('text'); setNewStimulus(''); setNewQuestionImage(''); setNewQuestionText('');
-          
-          // Reset ALL states for new question to prevent leakage
-          setSingleCorrectIndex(0);
-          setComplexCorrectIndices([]);
-          
-          if (type === QuestionType.MATCHING) { 
-              setNewOptions(['Benar', 'Salah', '', '']);
-              setMatchingPairs([{left:'', right: 'Benar'}]); 
-          } else { 
-              setNewOptions(['', '', '', '']); 
-              setMatchingPairs([{left:'', right: 'Benar'}]); // Default reset
-          }
+          setEditingQuestionId(null); setStimulusType('text'); setNewStimulus(''); setNewQuestionImage(''); setNewQuestionText('');
+          setSingleCorrectIndex(0); setComplexCorrectIndices([]);
+          if (type === QuestionType.MATCHING) { setNewOptions(['Benar', 'Salah', '', '']); setMatchingPairs([{left:'', right: 'Benar'}]); } 
+          else { setNewOptions(['', '', '', '']); setMatchingPairs([{left:'', right: 'Benar'}]); }
       }
   };
 
@@ -565,417 +446,154 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- RENDER ---
   if (activeTab === 'dashboard') {
     return (
-      <div className="p-8 h-full overflow-y-auto">
-        <h2 className="text-3xl font-black mb-6 text-white uppercase tracking-wider flex items-center gap-3"><span className="w-2 h-8 bg-yellow-500 block"></span>Dashboard {userRole === Role.ADMIN ? 'Admin' : (userRole === Role.TEACHER_LITERASI ? 'Guru Literasi' : 'Guru Numerasi')}</h2>
+      <div className="p-8 h-full overflow-y-auto bg-[#F2F4F8] text-slate-800">
+        <h2 className="text-3xl font-black mb-6 uppercase tracking-wider flex items-center gap-3"><span className="w-2 h-8 bg-[#00A2FF] block"></span>Dashboard {userRole === Role.ADMIN ? 'Admin' : (userRole === Role.TEACHER_LITERASI ? 'Guru Literasi' : 'Guru Numerasi')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900/80 p-6 border border-white/10"><h3 className="text-sm font-bold text-slate-400 uppercase">Total Siswa</h3><p className="text-5xl font-black text-blue-500">{students.length}</p></div>
-          <div className="bg-slate-900/80 p-6 border border-white/10"><h3 className="text-sm font-bold text-slate-400 uppercase">Total Paket Soal</h3><p className="text-5xl font-black text-purple-500">{packets.length}</p></div>
-          <div className="bg-slate-900/80 p-6 border border-white/10"><h3 className="text-sm font-bold text-slate-400 uppercase">Ujian Aktif</h3><p className="text-5xl font-black text-green-500">{exams.filter(e => e.isActive).length}</p></div>
+          <div className="bg-white p-6 border-2 border-slate-200 rounded-2xl shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase">Total Siswa</h3><p className="text-5xl font-black text-[#00A2FF]">{students.length}</p></div>
+          <div className="bg-white p-6 border-2 border-slate-200 rounded-2xl shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase">Total Paket Soal</h3><p className="text-5xl font-black text-purple-500">{packets.length}</p></div>
+          <div className="bg-white p-6 border-2 border-slate-200 rounded-2xl shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase">Ujian Aktif</h3><p className="text-5xl font-black text-[#00B06F]">{exams.filter(e => e.isActive).length}</p></div>
         </div>
       </div>
     );
   }
+  
+  // STUDENTS TAB
+  if (activeTab === 'students' && userRole === Role.ADMIN) {
+     const filteredStudents = students.filter(s => 
+         (selectedClassFilter === '' || s.class === selectedClassFilter) &&
+         (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.nis.includes(searchTerm))
+     );
 
-  // SETTINGS
-  if (activeTab === 'settings') {
-      return (
-          <div className="p-8 h-full overflow-y-auto">
-              <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-wider mb-6"><Settings className="text-yellow-500"/> Pengaturan</h2>
-              <div className="max-w-2xl bg-slate-900/80 border border-white/10 p-8 rounded-lg">
-                  <div className="space-y-4">
-                      {/* Server URL Config */}
-                      <div className="p-4 bg-slate-800 border border-blue-500/50 rounded mb-6">
-                          <label className="text-xs font-bold text-blue-400 uppercase block mb-1 flex items-center gap-2"><Link size={12}/> Google Apps Script URL (Server)</label>
-                          <div className="flex gap-2">
-                              <input 
-                                type="text" 
-                                className="flex-1 bg-black border border-slate-600 p-3 text-white text-xs font-mono" 
-                                value={currentScriptUrl || ''} 
-                                onChange={e => onUpdateScriptUrl && onUpdateScriptUrl(e.target.value)} 
-                                placeholder="https://script.google.com/macros/s/..."
-                              />
-                              <button 
-                                onClick={() => {
-                                    if(confirm("Reset URL ke default?")) {
-                                        onUpdateScriptUrl && onUpdateScriptUrl("https://script.google.com/macros/s/AKfycbxL7lY6k-DcV2yGsohpAF04k1h3YzYQmsKGa5q9waoH2cd2P1sMYtx4nSr_Z4YqyeioQw/exec");
-                                    }
-                                }}
-                                className="px-3 bg-slate-700 hover:bg-slate-600 text-white rounded border border-slate-600"
-                                title="Reset Default URL"
-                              >
-                                  <RefreshCcw size={14}/>
-                              </button>
-                          </div>
-                          <p className="text-[10px] text-slate-400 mt-1">
-                              Update URL ini jika Anda melakukan 'New Deployment' di Apps Script untuk memperbaiki permission.
-                          </p>
-                      </div>
+     return (
+        <div className="p-8 h-full flex flex-col bg-[#F2F4F8] text-slate-800">
+             <div className="flex justify-between items-center mb-6 flex-none">
+                 <h2 className="text-2xl font-black uppercase flex items-center gap-2"><GraduationCap className="text-[#00A2FF]"/> Data Siswa</h2>
+                 <div className="flex gap-2">
+                     <input type="file" ref={studentFileRef} className="hidden" accept=".xlsx" onChange={handleImportStudentExcel} />
+                     <button onClick={handleDownloadTemplateStudent} className="bg-white text-slate-500 border-2 border-slate-200 px-3 py-2 text-xs font-bold uppercase rounded-xl flex items-center gap-2 hover:border-[#00A2FF] hover:text-[#00A2FF] transition-colors"><Download size={14}/> Template</button>
+                     <button onClick={() => studentFileRef.current?.click()} className="bg-[#00A2FF] text-white px-3 py-2 text-xs font-bold uppercase rounded-xl flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm btn-3d"><Upload size={14}/> Import Excel</button>
+                     <button onClick={() => setShowAddStudentModal(true)} className="bg-[#00B06F] text-white px-3 py-2 text-xs font-bold uppercase rounded-xl flex items-center gap-2 hover:bg-[#009e63] transition-colors shadow-sm btn-3d"><Plus size={14}/> Tambah Siswa</button>
+                 </div>
+             </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Nama Sekolah</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.schoolName} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, schoolName: e.target.value})} /></div>
-                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Judul Login (CBT)</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm" value={schoolSettings?.cbtTitle || ''} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, cbtTitle: e.target.value})} /></div>
-                      </div>
-                      
-                      <hr className="border-slate-700 my-4"/>
-                      <h3 className="font-bold text-yellow-500 text-sm uppercase">Akun & Keamanan</h3>
-                      
-                      <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Password Admin</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm font-mono" value={schoolSettings?.adminPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, adminPassword: e.target.value})} /></div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Pass Guru Literasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm font-mono" value={schoolSettings?.teacherLiterasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherLiterasiPassword: e.target.value})} /></div>
-                          <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Pass Guru Numerasi</label><input type="text" className="w-full bg-black/50 border border-slate-700 p-3 text-white text-sm font-mono" value={schoolSettings?.teacherNumerasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherNumerasiPassword: e.target.value})} /></div>
-                      </div>
-                      
-                      <button className="w-full md:w-auto px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded mt-4" onClick={() => { alert("Disimpan!"); triggerSync(); }}>Simpan Perubahan</button>
-                  </div>
-              </div>
-          </div>
-      );
-  }
+             <div className="grid grid-cols-4 gap-4 mb-6">
+                 {CLASS_LIST.map(c => {
+                     const count = students.filter(s => s.class === c).length;
+                     return (
+                         <div key={c} onClick={() => setSelectedClassFilter(selectedClassFilter === c ? '' : c)} className={`cursor-pointer bg-white p-4 border-2 rounded-xl transition-all shadow-sm ${selectedClassFilter === c ? 'border-[#00A2FF] ring-2 ring-blue-100' : 'border-slate-200 hover:border-blue-300'}`}>
+                             <p className="text-xs font-black text-slate-400 uppercase">KELAS {c}</p>
+                             <p className="text-2xl font-black text-slate-800">{count} <span className="text-xs font-medium text-slate-400">Siswa</span></p>
+                         </div>
+                     )
+                 })}
+             </div>
 
-  // DATA SISWA
-  if (activeTab === 'students') {
-    const filteredStudents = students.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (selectedClassFilter === '' || s.class === selectedClassFilter)
-    );
-
-    return (
-      <div className="p-8 h-full flex flex-col">
-        <h2 className="text-2xl font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2"><GraduationCap className="text-yellow-500"/> Data Siswa</h2>
-        
-        {/* Toolbar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between">
-           <div className="flex gap-2 flex-1">
-               <div className="relative flex-1 max-w-md">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-                   <input className="w-full bg-black border border-slate-700 rounded p-2 pl-10 text-white text-sm" placeholder="Cari Siswa..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
-               </div>
-               <select className="bg-black border border-slate-700 text-white rounded p-2 text-sm" value={selectedClassFilter} onChange={e=>setSelectedClassFilter(e.target.value)}>
-                   <option value="">Semua Kelas</option>
-                   {CLASS_LIST.map(c=><option key={c} value={c}>{c}</option>)}
-               </select>
-           </div>
-           <div className="flex gap-2">
-               <button onClick={handleDownloadTemplateStudent} className="bg-slate-800 text-white px-3 py-2 rounded text-xs font-bold uppercase border border-slate-600 flex items-center gap-2 hover:bg-slate-700"><Download size={14}/> Template</button>
-               <div className="relative">
-                   <input type="file" ref={studentFileRef} className="hidden" accept=".xlsx" onChange={handleImportStudentExcel} />
-                   <button onClick={() => studentFileRef.current?.click()} className="bg-green-700 text-white px-3 py-2 rounded text-xs font-bold uppercase border border-green-600 flex items-center gap-2 hover:bg-green-600"><FileSpreadsheet size={14}/> Import Excel</button>
-               </div>
-               <button onClick={() => setShowAddStudentModal(true)} className="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold uppercase border border-blue-500 flex items-center gap-2 hover:bg-blue-500"><Plus size={14}/> Tambah</button>
-           </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-slate-900 border border-white/10 rounded overflow-hidden flex-1 flex flex-col">
-            <div className="overflow-auto flex-1 custom-scrollbar">
-                <table className="w-full text-sm text-left text-slate-300">
-                    <thead className="text-xs text-slate-400 uppercase bg-black sticky top-0">
-                        <tr>
-                            <th className="px-6 py-3">No</th>
-                            <th className="px-6 py-3">Nama</th>
-                            <th className="px-6 py-3">Kelas</th>
-                            <th className="px-6 py-3">NIS</th>
-                            <th className="px-6 py-3">NISN</th>
-                            <th className="px-6 py-3 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredStudents.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-slate-500">Tidak ada data siswa.</td></tr>}
-                        {filteredStudents.map((s, i) => (
-                            <tr key={s.id} className="border-b border-slate-800 hover:bg-white/5">
-                                <td className="px-6 py-3">{i+1}</td>
-                                <td className="px-6 py-3 font-bold text-white">{s.name}</td>
-                                <td className="px-6 py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{s.class}</span></td>
-                                <td className="px-6 py-3 font-mono">{s.nis}</td>
-                                <td className="px-6 py-3 font-mono">{s.nisn}</td>
-                                <td className="px-6 py-3 text-center">
-                                    <button onClick={() => handleDeleteStudent(s.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16}/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            <div className="bg-black p-2 border-t border-slate-800 text-xs text-slate-500 px-6">Total: {filteredStudents.length} Siswa</div>
-        </div>
-
-        {/* Modal Add Student */}
-        {showAddStudentModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-                <div className="bg-slate-900 border border-slate-700 p-6 rounded w-full max-w-sm">
-                    <h3 className="font-bold text-white mb-4">Tambah Siswa Manual</h3>
-                    <input className="w-full bg-black border border-slate-700 p-2 mb-2 text-white text-sm" placeholder="Nama Lengkap" value={newStudent.name} onChange={e=>setNewStudent({...newStudent, name:e.target.value})} />
-                    <select className="w-full bg-black border border-slate-700 p-2 mb-2 text-white text-sm" value={newStudent.class} onChange={e=>setNewStudent({...newStudent, class:e.target.value})}>
-                        <option value="">Pilih Kelas</option>
-                        {CLASS_LIST.map(c=><option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <input className="w-full bg-black border border-slate-700 p-2 mb-2 text-white text-sm" placeholder="NIS" value={newStudent.nis} onChange={e=>setNewStudent({...newStudent, nis:e.target.value})} />
-                    <input className="w-full bg-black border border-slate-700 p-2 mb-4 text-white text-sm" placeholder="NISN" value={newStudent.nisn} onChange={e=>setNewStudent({...newStudent, nisn:e.target.value})} />
-                    <div className="flex gap-2">
-                        <button onClick={handleAddStudent} className="flex-1 bg-blue-600 text-white py-2 font-bold text-sm">Simpan</button>
-                        <button onClick={() => setShowAddStudentModal(false)} className="flex-1 bg-slate-700 text-white py-2 font-bold text-sm">Batal</button>
-                    </div>
-                </div>
-            </div>
-        )}
-      </div>
-    );
-  }
-
-  // MONITORING
-  if (activeTab === 'monitor') {
-    const activeExam = exams.find(e => e.id === selectedExamForMonitor);
-    // Filter students: Must be in exam target class AND (if filter active) match filter
-    const eligibleStudents = activeExam 
-      ? students.filter(s => {
-          const targetClasses = activeExam.classTarget.map(c => c.replace(/\s/g, '').toUpperCase());
-          const sClass = s.class.replace(/\s/g, '').toUpperCase();
-          const matchesTarget = targetClasses.includes(sClass);
-          const matchesFilter = monitoringClassFilter === '' || s.class === monitoringClassFilter;
-          return matchesTarget && matchesFilter;
-        })
-      : [];
-    
-    // Map status
-    const data = eligibleStudents.map(s => {
-        const res = examResults.find(r => r.examId === activeExam?.id && r.studentId === s.id);
-        const status = res ? (res.isDisqualified ? 'DISQUALIFIED' : 'SELESAI') : 'BELUM';
-        return { ...s, status, score: res?.score || 0, violations: res?.violationCount || 0, timestamp: res?.timestamp };
-    });
-
-    // Apply Status Filter
-    const filteredData = data.filter(d => {
-        if(monitoringStatusFilter === 'finished') return d.status === 'SELESAI' || d.status === 'DISQUALIFIED';
-        if(monitoringStatusFilter === 'unfinished') return d.status === 'BELUM';
-        if(monitoringStatusFilter === 'suspicious') return d.violations > 0;
-        return true;
-    });
-
-    return (
-        <div className="p-8 h-full flex flex-col">
-            <h2 className="text-2xl font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2"><Activity className="text-yellow-500"/> Live Monitoring</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-slate-900 p-4 border border-slate-700">
-                    <label className="text-[10px] text-blue-400 uppercase font-bold block mb-1">Pilih Ujian</label>
-                    <select className="w-full bg-black text-white border border-slate-700 p-2 text-sm" value={selectedExamForMonitor} onChange={e=>setSelectedExamForMonitor(e.target.value)}>
-                        <option value="">-- Pilih Ujian --</option>
-                        {exams.filter(e=>e.isActive).map(e=><option key={e.id} value={e.id}>{e.title}</option>)}
-                        {exams.filter(e=>e.isActive).length===0 && <option disabled>Tidak ada ujian aktif</option>}
-                    </select>
-                </div>
-                <div className="bg-slate-900 p-4 border border-slate-700">
-                    <label className="text-[10px] text-blue-400 uppercase font-bold block mb-1">Filter Kelas</label>
-                    <select className="w-full bg-black text-white border border-slate-700 p-2 text-sm" value={monitoringClassFilter} onChange={e=>setMonitoringClassFilter(e.target.value)}>
-                        <option value="">Semua Kelas</option>
-                        {activeExam?.classTarget.map(c=><option key={c} value={c}>{c}</option>)}
-                    </select>
-                </div>
-                 <div className="bg-slate-900 p-4 border border-slate-700">
-                    <label className="text-[10px] text-blue-400 uppercase font-bold block mb-1">Status</label>
-                    <select className="w-full bg-black text-white border border-slate-700 p-2 text-sm" value={monitoringStatusFilter} onChange={e=>setMonitoringStatusFilter(e.target.value as any)}>
-                        <option value="all">Semua Status</option>
-                        <option value="finished">Selesai</option>
-                        <option value="unfinished">Belum Mengerjakan</option>
-                        <option value="suspicious">Terindikasi Curang</option>
-                    </select>
-                </div>
-                <div className="bg-slate-900 p-4 border border-slate-700 flex flex-col justify-center items-center">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Progress</span>
-                    <span className="text-2xl font-black text-white">{data.filter(d=>d.status!=='BELUM').length} / {data.length}</span>
-                </div>
-            </div>
-
-            <div className="bg-slate-900 border border-white/10 rounded overflow-hidden flex-1 flex flex-col">
-                <div className="overflow-auto flex-1 custom-scrollbar">
-                    <table className="w-full text-sm text-left text-slate-300">
-                        <thead className="text-xs text-slate-400 uppercase bg-black sticky top-0">
-                            <tr>
-                                <th className="px-6 py-3">Nama</th>
-                                <th className="px-6 py-3">Kelas</th>
-                                <th className="px-6 py-3 text-center">Status</th>
-                                <th className="px-6 py-3 text-center">Nilai</th>
-                                <th className="px-6 py-3 text-center">Pelanggaran</th>
-                                <th className="px-6 py-3 text-right">Waktu</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {activeExam && filteredData.map((s, i) => (
-                                <tr key={i} className="border-b border-slate-800 hover:bg-white/5">
-                                    <td className="px-6 py-3 font-bold text-white">{s.name}</td>
-                                    <td className="px-6 py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{s.class}</span></td>
-                                    <td className="px-6 py-3 text-center">
-                                        {s.status === 'SELESAI' && <span className="text-green-500 font-bold text-xs bg-green-900/30 px-2 py-1 rounded">SELESAI</span>}
-                                        {s.status === 'DISQUALIFIED' && <span className="text-red-500 font-bold text-xs bg-red-900/30 px-2 py-1 rounded">DISKUALIFIKASI</span>}
-                                        {s.status === 'BELUM' && <span className="text-slate-500 font-bold text-xs bg-slate-800 px-2 py-1 rounded">BELUM</span>}
-                                    </td>
-                                    <td className="px-6 py-3 text-center font-mono text-yellow-500 font-bold">{s.status !== 'BELUM' ? Math.round(s.score) : '-'}</td>
-                                    <td className="px-6 py-3 text-center">
-                                        {s.violations > 0 ? (
-                                            <span className="text-red-500 flex items-center justify-center gap-1 font-bold"><AlertTriangle size={12}/> {s.violations}</span>
-                                        ) : <span className="text-slate-600">-</span>}
-                                    </td>
-                                    <td className="px-6 py-3 text-right font-mono text-xs">{s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : '-'}</td>
-                                </tr>
-                            ))}
-                            {!activeExam && <tr><td colSpan={6} className="text-center py-10 text-slate-500">Pilih ujian terlebih dahulu.</td></tr>}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
-  }
-
-  // ANALISIS
-  if (activeTab === 'analysis') {
-      const activeExam = exams.find(e => e.id === selectedExamIdForAnalysis);
-
-      return (
-          <div className="p-8 h-full flex flex-col">
-              <h2 className="text-2xl font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2"><BarChart2 className="text-yellow-500"/> Analisis Hasil</h2>
-              
-              <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-start md:items-center">
-                  <div className="flex gap-2">
-                       <select className="bg-black border border-slate-700 text-white rounded p-2 text-sm" value={selectedExamIdForAnalysis} onChange={e=>setSelectedExamIdForAnalysis(e.target.value)}>
-                           <option value="">-- Pilih Ujian --</option>
-                           {visibleExams.map(e=><option key={e.id} value={e.id}>{e.title}</option>)}
-                       </select>
-                  </div>
-                  {activeExam && (
-                      <div className="flex gap-2">
-                          <button onClick={() => setAnalysisSubTab('recap')} className={`px-4 py-2 rounded text-xs font-bold uppercase ${analysisSubTab==='recap' ? 'bg-yellow-500 text-black' : 'bg-slate-800 text-white'}`}>Rekap Nilai</button>
-                          <button onClick={() => setAnalysisSubTab('item')} className={`px-4 py-2 rounded text-xs font-bold uppercase ${analysisSubTab==='item' ? 'bg-yellow-500 text-black' : 'bg-slate-800 text-white'}`}>Analisis Soal</button>
-                      </div>
-                  )}
-              </div>
-
-              {activeExam ? (
-                  <div className="bg-slate-900 border border-white/10 rounded overflow-hidden flex-1 flex flex-col">
-                      {/* Toolbar Inside Panel */}
-                      <div className="p-4 border-b border-slate-800 flex justify-end">
-                           {analysisSubTab === 'recap' ? (
-                               <button onClick={handleDownloadRecapExcel} className="text-green-500 text-xs font-bold uppercase flex items-center gap-2 hover:text-green-400"><FileSpreadsheet size={16}/> Download Excel</button>
-                           ) : (
-                               <button onClick={handleDownloadAnalysisExcel} className="text-green-500 text-xs font-bold uppercase flex items-center gap-2 hover:text-green-400"><FileSpreadsheet size={16}/> Download Analisis</button>
-                           )}
-                      </div>
-
-                      <div className="overflow-auto flex-1 custom-scrollbar p-4">
-                          {analysisSubTab === 'recap' && (
-                              <table className="w-full text-sm text-left text-slate-300">
-                                  <thead className="text-xs text-slate-400 uppercase bg-black">
-                                      <tr>
-                                          <th className="px-4 py-2">Rank</th>
-                                          <th className="px-4 py-2">Nama</th>
-                                          <th className="px-4 py-2">Kelas</th>
-                                          <th className="px-4 py-2 text-center">Score</th>
-                                          <th className="px-4 py-2 text-center">Literasi</th>
-                                          <th className="px-4 py-2 text-center">Numerasi</th>
-                                          <th className="px-4 py-2 text-right">Waktu</th>
-                                      </tr>
-                                  </thead>
-                                  <tbody>
-                                      {examResults.filter(r => r.examId === activeExam.id).sort((a,b) => b.score - a.score).map((r, i) => (
-                                          <tr key={i} className="border-b border-slate-800 hover:bg-white/5">
-                                              <td className="px-4 py-2 font-mono text-slate-500">#{i+1}</td>
-                                              <td className="px-4 py-2 font-bold text-white">{r.studentName}</td>
-                                              <td className="px-4 py-2"><span className="bg-slate-800 px-2 py-0.5 rounded text-[10px]">{r.studentClass}</span></td>
-                                              <td className="px-4 py-2 text-center font-black text-yellow-500">{Math.round(r.score)}</td>
-                                              <td className="px-4 py-2 text-center text-blue-400">{Math.round(r.literasiScore)}</td>
-                                              <td className="px-4 py-2 text-center text-green-400">{Math.round(r.numerasiScore)}</td>
-                                              <td className="px-4 py-2 text-right text-xs font-mono">{new Date(r.timestamp).toLocaleString()}</td>
-                                          </tr>
-                                      ))}
-                                      {examResults.filter(r => r.examId === activeExam.id).length === 0 && <tr><td colSpan={7} className="text-center py-10">Belum ada data nilai.</td></tr>}
-                                  </tbody>
-                              </table>
-                          )}
-
-                          {analysisSubTab === 'item' && (
-                              <div className="space-y-4">
-                                  {activeExam.questions.map((q, idx) => {
-                                      const stats = getItemAnalysis(q.id, q);
-                                      return (
-                                          <div key={q.id} className="bg-black/40 border border-slate-800 p-4 rounded flex gap-4">
-                                              <div className={`w-12 h-12 flex items-center justify-center font-black text-lg rounded ${stats.correctRate > 70 ? 'bg-green-600 text-white' : stats.correctRate > 40 ? 'bg-yellow-600 text-black' : 'bg-red-600 text-white'}`}>
-                                                  {Math.round(stats.correctRate)}%
-                                              </div>
-                                              <div className="flex-1">
-                                                  <div className="flex justify-between mb-1">
-                                                      <span className="font-bold text-white text-sm">Soal No. {idx+1}</span>
-                                                      <span className="text-xs text-slate-500">Dijawab Benar: {stats.correctCount} / {stats.totalAttempts} Siswa</span>
-                                                  </div>
-                                                  <p className="text-slate-400 text-sm line-clamp-2 mb-2">{q.text}</p>
-                                                  
-                                                  {/* Distractor Bar (Simple) */}
-                                                  {q.type === QuestionType.SINGLE && (
-                                                      <div className="flex h-2 rounded overflow-hidden bg-slate-800 mt-2">
-                                                          {['A','B','C','D'].map((opt, i) => {
-                                                              const count = stats.answerDist[i];
-                                                              const pct = stats.totalAttempts > 0 ? (count / stats.totalAttempts) * 100 : 0;
-                                                              if(pct === 0) return null;
-                                                              return (
-                                                                  <div key={i} className={`h-full ${i === q.correctAnswerIndex ? 'bg-green-500' : 'bg-red-500 opacity-50'}`} style={{width: `${pct}%`}} title={`${opt}: ${count} (${Math.round(pct)}%)`}></div>
-                                                              );
-                                                          })}
-                                                      </div>
-                                                  )}
-                                              </div>
-                                          </div>
-                                      );
-                                  })}
-                              </div>
-                          )}
-                      </div>
-                  </div>
-              ) : (
-                  <div className="flex-1 border border-dashed border-slate-700 rounded flex items-center justify-center text-slate-500">
-                      Pilih ujian untuk melihat analisis data.
-                  </div>
-              )}
-          </div>
-      );
-  }
-
-  // BANK SOAL (Existing Logic preserved)
-  if (activeTab === 'questions') {
-    return (
-      <div className="p-8 flex flex-col h-full overflow-hidden">
-         <div className="flex justify-between items-center mb-6 flex-none border-b border-white/10 pb-4">
-             <div className="flex items-center gap-4">
-                 <h2 className="text-2xl font-black text-white uppercase"><BookOpen className="inline mr-2 text-yellow-500"/> Bank Soal</h2>
-                 <div className="flex bg-slate-800 rounded border border-slate-700">
-                     <button onClick={() => setBankSubTab('config')} className={`px-4 py-2 text-xs font-bold uppercase transition-all ${bankSubTab==='config'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'}`}>Paket</button>
-                     <button onClick={() => setBankSubTab('input')} className={`px-4 py-2 text-xs font-bold uppercase transition-all ${bankSubTab==='input'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'}`}>Input Soal</button>
+             <div className="bg-white border-2 border-slate-200 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-sm">
+                 <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                     <div className="relative">
+                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+                         <input className="pl-9 pr-4 py-2 bg-white border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-[#00A2FF]" placeholder="Cari Nama / NIS..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                     </div>
+                     <span className="text-xs font-bold text-slate-400 uppercase">{filteredStudents.length} Data Ditampilkan</span>
+                 </div>
+                 <div className="flex-1 overflow-auto">
+                     <table className="w-full text-left border-collapse">
+                         <thead className="bg-slate-50 sticky top-0 z-10">
+                             <tr>
+                                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-200">No</th>
+                                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-200">Nama Siswa</th>
+                                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-200">Kelas</th>
+                                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-200">NIS</th>
+                                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-200">NISN</th>
+                                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-200 text-center">Aksi</th>
+                             </tr>
+                         </thead>
+                         <tbody className="divide-y divide-slate-100">
+                             {filteredStudents.map((s, idx) => (
+                                 <tr key={s.id} className="hover:bg-blue-50/50 transition-colors">
+                                     <td className="p-4 text-sm font-bold text-slate-500">{idx + 1}</td>
+                                     <td className="p-4 text-sm font-bold text-slate-800">{s.name}</td>
+                                     <td className="p-4 text-sm font-bold"><span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs">{s.class}</span></td>
+                                     <td className="p-4 text-sm font-mono text-slate-500">{s.nis}</td>
+                                     <td className="p-4 text-sm font-mono text-slate-500">{s.nisn}</td>
+                                     <td className="p-4 text-center">
+                                         <button onClick={() => handleDeleteStudent(s.id)} className="text-slate-400 hover:text-red-500 transition-colors bg-slate-50 p-2 rounded-lg hover:bg-red-50"><Trash2 size={16}/></button>
+                                     </td>
+                                 </tr>
+                             ))}
+                             {filteredStudents.length === 0 && (
+                                 <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-bold italic">Data siswa tidak ditemukan.</td></tr>
+                             )}
+                         </tbody>
+                     </table>
                  </div>
              </div>
              
-             {/* Import/Template Actions */}
+             {showAddStudentModal && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm">
+                     <div className="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl border-2 border-slate-200">
+                         <h3 className="text-xl font-black text-slate-800 mb-6 uppercase">Tambah Siswa</h3>
+                         <div className="space-y-4">
+                             <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Nama Lengkap</label><input className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} /></div>
+                             <div>
+                                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Kelas</label>
+                                 <select className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={newStudent.class} onChange={e => setNewStudent({...newStudent, class: e.target.value})}>
+                                     <option value="">Pilih Kelas</option>
+                                     {CLASS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+                                 </select>
+                             </div>
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">NIS</label><input className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={newStudent.nis} onChange={e => setNewStudent({...newStudent, nis: e.target.value})} /></div>
+                                 <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">NISN</label><input className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={newStudent.nisn} onChange={e => setNewStudent({...newStudent, nisn: e.target.value})} /></div>
+                             </div>
+                             <div className="flex gap-2 mt-6">
+                                 <button onClick={() => setShowAddStudentModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-black rounded-xl hover:bg-slate-200">BATAL</button>
+                                 <button onClick={handleAddStudent} className="flex-1 py-3 bg-[#00A2FF] text-white font-black rounded-xl hover:bg-blue-600 shadow-lg shadow-blue-200">SIMPAN</button>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             )}
+        </div>
+     );
+  }
+
+  // BANK SOAL
+  if (activeTab === 'questions') {
+    return (
+      <div className="p-8 flex flex-col h-full overflow-hidden bg-[#F2F4F8] text-slate-800">
+         <div className="flex justify-between items-center mb-6 flex-none border-b border-slate-200 pb-4">
+             <div className="flex items-center gap-4">
+                 <h2 className="text-2xl font-black uppercase"><BookOpen className="inline mr-2 text-[#00A2FF]"/> Bank Soal</h2>
+                 <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden">
+                     <button onClick={() => setBankSubTab('config')} className={`px-4 py-2 text-xs font-bold uppercase transition-all ${bankSubTab==='config'?'bg-blue-50 text-blue-600 border-b-2 border-blue-600':'text-slate-400 hover:text-slate-600'}`}>Paket</button>
+                     <button onClick={() => setBankSubTab('input')} className={`px-4 py-2 text-xs font-bold uppercase transition-all ${bankSubTab==='input'?'bg-blue-50 text-blue-600 border-b-2 border-blue-600':'text-slate-400 hover:text-slate-600'}`}>Input Soal</button>
+                 </div>
+             </div>
+             
              <div className="flex gap-2">
                  <input type="file" ref={questionFileRef} className="hidden" accept=".xlsx" onChange={handleImportQuestions} />
-                 <button onClick={handleDownloadTemplateQuestion} className="bg-slate-800 text-slate-300 border border-slate-600 px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2 hover:bg-slate-700 transition-colors"><Download size={14}/> Template</button>
-                 <button onClick={() => questionFileRef.current?.click()} className="bg-green-700 text-white px-3 py-2 text-xs font-bold uppercase rounded flex items-center gap-2 hover:bg-green-600 transition-colors shadow-lg"><Upload size={14}/> Import Excel</button>
+                 <button onClick={handleDownloadTemplateQuestion} className="bg-white text-slate-500 border-2 border-slate-200 px-3 py-2 text-xs font-bold uppercase rounded-xl flex items-center gap-2 hover:border-[#00A2FF] hover:text-[#00A2FF] transition-colors"><Download size={14}/> Template</button>
+                 <button onClick={() => questionFileRef.current?.click()} className="bg-[#00B06F] text-white px-3 py-2 text-xs font-bold uppercase rounded-xl flex items-center gap-2 hover:bg-[#009e63] transition-colors shadow-sm btn-3d"><Upload size={14}/> Import Excel</button>
              </div>
          </div>
          
          {bankSubTab === 'config' && (
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden min-h-0">
-                 {/* (Packet Config Form remains the same) */}
-                 <div className="bg-slate-900 p-6 border border-white/10 h-fit">
-                     <h3 className="font-bold text-white mb-4">{editingPacketId ? 'Edit Paket' : 'Buat Paket'}</h3>
-                     <input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama" value={newPacketName} onChange={e=>setNewPacketName(e.target.value)}/>
-                     <select className="w-full bg-black p-2 mb-2 text-white border border-slate-700" value={newPacketCategory} onChange={(e) => setNewPacketCategory(e.target.value as QuestionCategory)} disabled={userRole !== Role.ADMIN}><option value={QuestionCategory.LITERASI}>Literasi</option><option value={QuestionCategory.NUMERASI}>Numerasi</option></select>
-                     <input type="number" className="w-full bg-black p-2 mb-4 text-white border border-slate-700" placeholder="Total Soal" value={newPacketTotal} onChange={e=>setNewPacketTotal(parseInt(e.target.value))}/>
-                     <button onClick={handleSavePacket} className="w-full bg-blue-600 text-white py-2 font-bold">{editingPacketId ? 'Update' : 'Simpan'}</button>
-                     {editingPacketId && <button onClick={() => { setEditingPacketId(null); setNewPacketName(''); setNewPacketTotal(''); }} className="w-full bg-slate-700 text-white py-2 font-bold mt-2">Batal</button>}
+                 <div className="bg-white p-6 border-2 border-slate-200 rounded-3xl h-fit shadow-sm">
+                     <h3 className="font-bold text-slate-800 mb-4 uppercase text-sm">{editingPacketId ? 'Edit Paket' : 'Buat Paket'}</h3>
+                     <input className="w-full bg-slate-50 p-3 mb-2 text-slate-800 border-2 border-slate-200 rounded-xl font-bold text-sm focus:border-[#00A2FF] outline-none" placeholder="Nama" value={newPacketName} onChange={e=>setNewPacketName(e.target.value)}/>
+                     <select className="w-full bg-slate-50 p-3 mb-2 text-slate-800 border-2 border-slate-200 rounded-xl font-bold text-sm focus:border-[#00A2FF] outline-none" value={newPacketCategory} onChange={(e) => setNewPacketCategory(e.target.value as QuestionCategory)} disabled={userRole !== Role.ADMIN}><option value={QuestionCategory.LITERASI}>Literasi</option><option value={QuestionCategory.NUMERASI}>Numerasi</option></select>
+                     <input type="number" className="w-full bg-slate-50 p-3 mb-4 text-slate-800 border-2 border-slate-200 rounded-xl font-bold text-sm focus:border-[#00A2FF] outline-none" placeholder="Total Soal" value={newPacketTotal} onChange={e=>setNewPacketTotal(parseInt(e.target.value))}/>
+                     <button onClick={handleSavePacket} className="w-full bg-[#00A2FF] text-white py-3 font-black rounded-xl uppercase tracking-wider btn-3d border-b-blue-700">{editingPacketId ? 'Update' : 'Simpan'}</button>
+                     {editingPacketId && <button onClick={() => { setEditingPacketId(null); setNewPacketName(''); setNewPacketTotal(''); }} className="w-full bg-slate-200 text-slate-500 py-3 font-bold mt-2 rounded-xl">Batal</button>}
                  </div>
                  <div className="lg:col-span-2 overflow-auto space-y-2">{visiblePackets.map(p=>(
-                     <div key={p.id} className="bg-slate-900 border border-slate-700 p-3 flex justify-between items-center">
-                         <div><p className="text-white font-bold">{p.name}</p><p className="text-xs text-slate-500">{p.category} | {p.totalQuestions} Soal</p></div>
-                         <div className="flex gap-2">
-                             <button onClick={() => handleEditPacket(p)} className="text-yellow-500 hover:text-yellow-400"><Edit2 size={16}/></button>
-                             <button onClick={()=>deletePacket(p.id)} className="text-red-500 hover:text-red-400"><Trash2 size={16}/></button>
+                     <div key={p.id} className="bg-white border-2 border-slate-200 p-4 flex justify-between items-center rounded-2xl hover:border-[#00A2FF] transition-all group shadow-sm">
+                         <div><p className="text-slate-800 font-black">{p.name}</p><p className="text-xs text-slate-400 font-bold">{p.category} | {p.totalQuestions} Soal</p></div>
+                         <div className="flex gap-2 opacity-50 group-hover:opacity-100">
+                             <button onClick={() => handleEditPacket(p)} className="p-2 bg-slate-50 rounded-lg text-slate-400 hover:text-[#00A2FF] hover:bg-blue-50"><Edit2 size={16}/></button>
+                             <button onClick={()=>deletePacket(p.id)} className="p-2 bg-slate-50 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50"><Trash2 size={16}/></button>
                          </div>
                      </div>
                  ))}</div>
@@ -983,29 +601,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
          )}
          {bankSubTab === 'input' && (
              <div className="flex-1 flex flex-col min-h-0">
-                 <select className="w-full bg-slate-900 border border-slate-700 p-2 text-white mb-4 flex-none" value={selectedPacketId} onChange={e => {setSelectedPacketId(e.target.value); setActiveSlot(null);}}><option value="">Pilih Paket Soal</option>{visiblePackets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                 <select className="w-full bg-white border-2 border-slate-200 p-3 rounded-xl text-slate-700 mb-4 flex-none font-bold" value={selectedPacketId} onChange={e => {setSelectedPacketId(e.target.value); setActiveSlot(null);}}><option value="">Pilih Paket Soal</option>{visiblePackets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
                  {selectedPacketId && (
-                     <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 overflow-hidden min-h-0">
-                         <div className="bg-slate-900 border border-white/10 overflow-auto p-2"><div className="grid grid-cols-5 gap-1">{Array.from({length: visiblePackets.find(p=>p.id===selectedPacketId)?.totalQuestions||0}).map((_,i)=><button key={i} onClick={()=>prepareSlotForm(i+1)} className={`p-2 text-xs font-bold border ${activeSlot===i+1?'bg-yellow-500 text-black':'text-slate-400 border-slate-700'}`}>{i+1}</button>)}</div></div>
-                         <div className="lg:col-span-3 bg-slate-900 border border-white/10 p-4 overflow-y-auto flex flex-col min-h-0">
+                     <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 overflow-hidden min-h-0">
+                         <div className="bg-white border-2 border-slate-200 overflow-auto p-4 rounded-3xl shadow-sm"><div className="grid grid-cols-4 gap-2">{Array.from({length: visiblePackets.find(p=>p.id===selectedPacketId)?.totalQuestions||0}).map((_,i)=><button key={i} onClick={()=>prepareSlotForm(i+1)} className={`aspect-square rounded-xl text-xs font-black border-2 transition-all ${activeSlot===i+1?'bg-[#00A2FF] text-white border-blue-600 shadow-md transform scale-105':'bg-slate-50 text-slate-400 border-slate-200 hover:border-[#00A2FF]'}`}>{i+1}</button>)}</div></div>
+                         <div className="lg:col-span-3 bg-white border-2 border-slate-200 p-6 overflow-y-auto flex flex-col min-h-0 rounded-3xl shadow-sm">
                              {activeSlot ? (
-                                 <div className="space-y-4 flex-1">
-                                     <div className="flex justify-between">
-                                        <h3 className="text-white font-bold">Edit Soal {activeSlot}</h3>
+                                 <div className="space-y-6 flex-1">
+                                     <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                                        <h3 className="text-slate-800 font-black text-xl">Edit Soal {activeSlot}</h3>
                                         <div className="flex items-center gap-2">
-                                            {/* Math Toolbar Container */}
-                                            <div className="bg-black border border-slate-600 rounded flex items-center gap-1 p-1">
-                                                <button onClick={() => handleInsertMath('$^{}$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Pangkat">x²</button>
-                                                <button onClick={() => handleInsertMath('$_{}$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Subscript">x₂</button>
-                                                <button onClick={() => handleInsertMath('$\\sqrt{}$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Akar">√x</button>
-                                                <button onClick={() => handleInsertMath('$\\frac{a}{b}$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Pecahan">a/b</button>
-                                                <button onClick={() => handleInsertMath('$\\times$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Kali"><MultiplyIcon size={12}/></button>
-                                                <button onClick={() => handleInsertMath('$\\div$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Bagi"><Divide size={12}/></button>
-                                                <button onClick={() => handleInsertMath('$\\pi$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Pi">π</button>
-                                                <button onClick={() => handleInsertMath('$^{\\circ}$')} className="p-1 hover:bg-slate-800 text-white rounded text-xs border border-transparent hover:border-slate-500" title="Derajat">°</button>
+                                            <div className="bg-slate-50 border-2 border-slate-200 rounded-xl flex items-center gap-1 p-1">
+                                                <button onClick={() => handleInsertMath('$^{}$')} className="p-1 hover:bg-slate-200 text-slate-600 rounded text-xs font-bold" title="Pangkat">x²</button>
+                                                <button onClick={() => handleInsertMath('$_{}$')} className="p-1 hover:bg-slate-200 text-slate-600 rounded text-xs font-bold" title="Subscript">x₂</button>
+                                                <button onClick={() => handleInsertMath('$\\sqrt{}$')} className="p-1 hover:bg-slate-200 text-slate-600 rounded text-xs font-bold" title="Akar">√x</button>
+                                                <button onClick={() => handleInsertMath('$\\frac{a}{b}$')} className="p-1 hover:bg-slate-200 text-slate-600 rounded text-xs font-bold" title="Pecahan">a/b</button>
                                             </div>
                                             <select 
-                                                className="bg-black text-white p-1 text-xs border border-slate-700" 
+                                                className="bg-slate-50 text-slate-700 p-2 text-xs border-2 border-slate-200 rounded-xl font-bold" 
                                                 value={manualType} 
                                                 onChange={e => {
                                                     const t = e.target.value as QuestionType;
@@ -1023,21 +636,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                             >
                                                 <option value={QuestionType.SINGLE}>Pilihan Ganda</option>
                                                 <option value={QuestionType.COMPLEX}>PG Kompleks</option>
-                                                <option value={QuestionType.MATCHING}>Menjodohkan / Benar Salah</option>
+                                                <option value={QuestionType.MATCHING}>Menjodohkan</option>
                                             </select>
                                         </div>
                                      </div>
                                      
-                                     {/* STIMULUS SECTION */}
-                                     <div className="space-y-2 border-b border-slate-700 pb-4">
+                                     <div className="space-y-2 border-b border-slate-100 pb-6">
                                          <div className="flex gap-2 mb-2">
-                                             <button onClick={() => setStimulusType('text')} className={`text-xs px-3 py-1 rounded ${stimulusType === 'text' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Teks</button>
-                                             <button onClick={() => setStimulusType('image')} className={`text-xs px-3 py-1 rounded ${stimulusType === 'image' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Gambar</button>
+                                             <button onClick={() => setStimulusType('text')} className={`text-xs px-3 py-1 rounded-lg font-bold border-2 ${stimulusType === 'text' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>Teks</button>
+                                             <button onClick={() => setStimulusType('image')} className={`text-xs px-3 py-1 rounded-lg font-bold border-2 ${stimulusType === 'image' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>Gambar</button>
                                          </div>
                                          
                                          {stimulusType === 'text' ? (
                                              <textarea 
-                                                className="w-full bg-black p-2 text-white border border-slate-700 font-serif leading-relaxed focus:border-yellow-500 focus:outline-none" 
+                                                className="w-full bg-slate-50 p-4 text-slate-700 border-2 border-slate-200 rounded-xl font-medium focus:border-[#00A2FF] focus:outline-none" 
                                                 rows={4} 
                                                 placeholder="Masukkan teks stimulus di sini..." 
                                                 value={newStimulus} 
@@ -1048,39 +660,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                              <div className="space-y-2">
                                                  <input type="file" accept="image/*" ref={imageUploadRef} onChange={handleImageUpload} className="hidden" />
                                                  <div className="flex gap-2 items-center">
-                                                     <button disabled={isImageUploading} onClick={() => imageUploadRef.current?.click()} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 text-xs rounded flex items-center gap-2 border border-slate-600 disabled:opacity-50">
+                                                     <button disabled={isImageUploading} onClick={() => imageUploadRef.current?.click()} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 text-sm rounded-xl font-bold flex items-center gap-2 border-2 border-slate-200 disabled:opacity-50 transition-colors">
                                                          <Upload size={14}/> {isImageUploading ? 'Mengupload...' : 'Upload Gambar'}
                                                      </button>
-                                                     {isImageUploading && <RefreshCw size={14} className="animate-spin text-blue-500"/>}
-                                                     {newQuestionImage && <button onClick={() => setNewQuestionImage('')} className="text-red-500 text-xs">Hapus</button>}
+                                                     {isImageUploading && <RefreshCw size={14} className="animate-spin text-[#00A2FF]"/>}
+                                                     {newQuestionImage && <button onClick={() => setNewQuestionImage('')} className="text-red-500 text-xs font-bold">Hapus</button>}
                                                  </div>
-                                                 {newQuestionImage && <img src={newQuestionImage} alt="Stimulus" className="max-h-40 object-contain border border-slate-700 bg-black/50 rounded"/>}
+                                                 {newQuestionImage && <img src={newQuestionImage} alt="Stimulus" className="max-h-40 object-contain border-2 border-slate-200 bg-white rounded-xl shadow-sm"/>}
                                              </div>
                                          )}
                                      </div>
 
-                                     {/* QUESTION TEXT */}
                                      <div className="space-y-2">
-                                         <label className="text-xs text-slate-400">Pertanyaan</label>
+                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Pertanyaan</label>
                                          <textarea 
-                                            className="w-full bg-black p-2 text-white border border-slate-700 font-medium focus:border-yellow-500 focus:outline-none" 
+                                            className="w-full bg-white p-4 text-slate-800 border-2 border-slate-200 rounded-xl font-medium focus:border-[#00A2FF] focus:outline-none shadow-sm" 
                                             rows={3} 
-                                            placeholder="Pertanyaan..." 
+                                            placeholder="Tulis pertanyaan..." 
                                             value={newQuestionText} 
                                             onFocus={() => setLastFocusedField({ name: 'question' })}
                                             onChange={e=>setNewQuestionText(cleanWordHtml(e.target.value))}
                                          />
                                      </div>
                                      
-                                     {/* ANSWER INPUTS */}
-                                     <div className="border-t border-slate-700 pt-4">
-                                         <label className="text-xs text-slate-400 block mb-2">Jawaban ({manualType})</label>
+                                     <div className="border-t border-slate-100 pt-6">
+                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-4">Jawaban ({manualType})</label>
                                          
                                          {manualType === QuestionType.SINGLE && newOptions.map((o,i)=>(
-                                             <div key={i} className="flex gap-2 mb-2">
-                                                 <button onClick={()=>setSingleCorrectIndex(i)} className={`w-8 h-8 flex items-center justify-center border ${singleCorrectIndex===i?'bg-green-600 border-green-500 text-white':'bg-slate-800 border-slate-700 text-slate-500'}`}>{String.fromCharCode(65+i)}</button>
+                                             <div key={i} className="flex gap-2 mb-2 items-center">
+                                                 <button onClick={()=>setSingleCorrectIndex(i)} className={`w-10 h-10 flex items-center justify-center border-2 rounded-xl font-black transition-all ${singleCorrectIndex===i?'bg-[#00B06F] border-green-600 text-white shadow-md':'bg-slate-50 border-slate-200 text-slate-400'}`}>{String.fromCharCode(65+i)}</button>
                                                  <input 
-                                                    className="flex-1 bg-black p-1 text-white text-sm border border-slate-700 focus:border-yellow-500 focus:outline-none" 
+                                                    className="flex-1 bg-slate-50 p-3 text-slate-700 text-sm border-2 border-slate-200 rounded-xl font-medium focus:border-[#00A2FF] focus:outline-none" 
                                                     value={o} 
                                                     onFocus={() => setLastFocusedField({ name: 'option', index: i })}
                                                     onChange={e=>{const c=[...newOptions];c[i]=e.target.value;setNewOptions(c)}}
@@ -1089,18 +699,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                          ))}
 
                                          {manualType === QuestionType.COMPLEX && newOptions.map((o,i)=>(
-                                             <div key={i} className="flex gap-2 mb-2">
+                                             <div key={i} className="flex gap-2 mb-2 items-center">
                                                  <button 
                                                      onClick={() => {
                                                          if (complexCorrectIndices.includes(i)) setComplexCorrectIndices(complexCorrectIndices.filter(idx => idx !== i));
                                                          else setComplexCorrectIndices([...complexCorrectIndices, i]);
                                                      }} 
-                                                     className={`w-8 h-8 flex items-center justify-center border ${complexCorrectIndices.includes(i) ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
+                                                     className={`w-10 h-10 flex items-center justify-center border-2 rounded-xl transition-all ${complexCorrectIndices.includes(i) ? 'bg-[#00A2FF] border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-300'}`}
                                                  >
-                                                     <Check size={14} className={complexCorrectIndices.includes(i) ? 'opacity-100' : 'opacity-0'}/>
+                                                     <Check size={20} className={complexCorrectIndices.includes(i) ? 'opacity-100' : 'opacity-0'} strokeWidth={3}/>
                                                  </button>
                                                  <input 
-                                                    className="flex-1 bg-black p-1 text-white text-sm border border-slate-700 focus:border-yellow-500 focus:outline-none" 
+                                                    className="flex-1 bg-slate-50 p-3 text-slate-700 text-sm border-2 border-slate-200 rounded-xl font-medium focus:border-[#00A2FF] focus:outline-none" 
                                                     value={o} 
                                                     onFocus={() => setLastFocusedField({ name: 'option', index: i })}
                                                     onChange={e=>{const c=[...newOptions];c[i]=e.target.value;setNewOptions(c)}}
@@ -1112,110 +722,110 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                              <div className="space-y-4">
                                                  <div className="grid grid-cols-2 gap-4">
                                                      <div>
-                                                         <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block">Label Kolom 1 (Misal: Benar/Sesuai)</label>
-                                                         <input className="w-full bg-black p-2 text-white text-sm border border-slate-700" placeholder="Contoh: Benar" value={newOptions[0]} onChange={e => {const n = [...newOptions]; n[0] = e.target.value; setNewOptions(n)}} />
+                                                         <label className="text-[10px] text-blue-500 font-black uppercase mb-1 block">Label Kiri (Benar)</label>
+                                                         <input className="w-full bg-slate-50 p-3 text-slate-700 text-sm border-2 border-slate-200 rounded-xl font-bold" value={newOptions[0]} onChange={e => {const n = [...newOptions]; n[0] = e.target.value; setNewOptions(n)}} />
                                                      </div>
                                                      <div>
-                                                         <label className="text-[10px] text-red-400 font-bold uppercase mb-1 block">Label Kolom 2 (Misal: Salah/Tidak Sesuai)</label>
-                                                         <input className="w-full bg-black p-2 text-white text-sm border border-slate-700" placeholder="Contoh: Salah" value={newOptions[1]} onChange={e => {const n = [...newOptions]; n[1] = e.target.value; setNewOptions(n)}} />
+                                                         <label className="text-[10px] text-red-500 font-black uppercase mb-1 block">Label Kanan (Salah)</label>
+                                                         <input className="w-full bg-slate-50 p-3 text-slate-700 text-sm border-2 border-slate-200 rounded-xl font-bold" value={newOptions[1]} onChange={e => {const n = [...newOptions]; n[1] = e.target.value; setNewOptions(n)}} />
                                                      </div>
                                                  </div>
                                                  
-                                                 <div className="bg-slate-800/30 p-2 rounded">
-                                                     <label className="text-[10px] text-slate-400 font-bold uppercase mb-2 block">Daftar Pernyataan & Kunci Jawaban</label>
+                                                 <div className="bg-slate-50 p-4 rounded-xl border-2 border-slate-200">
+                                                     <label className="text-[10px] text-slate-400 font-black uppercase mb-3 block">Pasangan Jawaban</label>
                                                      {matchingPairs.map((pair, idx) => (
                                                          <div key={idx} className="flex gap-2 items-center mb-2">
-                                                             <span className="text-slate-500 font-mono text-xs w-6 text-center">{idx+1}.</span>
+                                                             <span className="text-slate-400 font-black text-xs w-6 text-center">{idx+1}.</span>
                                                              <input 
-                                                                className="flex-1 bg-black p-2 text-white text-sm border border-slate-700 focus:border-yellow-500 focus:outline-none" 
-                                                                placeholder="Isi Pernyataan..." 
+                                                                className="flex-1 bg-white p-3 text-slate-700 text-sm border-2 border-slate-200 rounded-xl focus:border-[#00A2FF] focus:outline-none font-medium" 
+                                                                placeholder="Pernyataan..." 
                                                                 value={pair.left} 
                                                                 onFocus={() => setLastFocusedField({ name: 'pair-left', index: idx })}
                                                                 onChange={e => {const n = [...matchingPairs]; n[idx].left = e.target.value; setMatchingPairs(n)}} 
                                                              />
                                                              <div className="w-32">
-                                                                <select className="w-full bg-black text-white p-2 text-sm border border-slate-700 cursor-pointer" value={pair.right} onChange={e => {const n = [...matchingPairs]; n[idx].right = e.target.value; setMatchingPairs(n)}}>
+                                                                <select className="w-full bg-white text-slate-700 p-3 text-sm border-2 border-slate-200 rounded-xl font-bold" value={pair.right} onChange={e => {const n = [...matchingPairs]; n[idx].right = e.target.value; setMatchingPairs(n)}}>
                                                                     <option value={newOptions[0]}>{newOptions[0] || 'Opsi 1'}</option>
                                                                     <option value={newOptions[1]}>{newOptions[1] || 'Opsi 2'}</option>
                                                                 </select>
                                                              </div>
-                                                             <button onClick={() => setMatchingPairs(matchingPairs.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-400 p-2"><X size={14}/></button>
+                                                             <button onClick={() => setMatchingPairs(matchingPairs.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-red-500 p-2"><X size={18}/></button>
                                                          </div>
                                                      ))}
-                                                     <button onClick={() => setMatchingPairs([...matchingPairs, {left:'', right: newOptions[0]}])} className="text-xs bg-blue-600/20 text-blue-400 px-3 py-1 rounded font-bold hover:bg-blue-600/30">+ Tambah Pernyataan</button>
+                                                     <button onClick={() => setMatchingPairs([...matchingPairs, {left:'', right: newOptions[0]}])} className="text-xs bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-black mt-2 hover:bg-blue-100">+ Tambah Baris</button>
                                                  </div>
                                              </div>
                                          )}
                                      </div>
 
-                                     {/* --- PREVIEW SECTION --- */}
-                                     <div className="mt-8 pt-8 border-t border-slate-700">
-                                        <h4 className="text-yellow-500 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2"><Eye size={16}/> Preview Tampilan Siswa</h4>
-                                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-lg relative">
+                                     {/* --- PREVIEW SECTION (Light Mode) --- */}
+                                     <div className="mt-8 pt-8 border-t-2 border-slate-100">
+                                        <h4 className="text-slate-400 font-black uppercase text-xs tracking-widest mb-4 flex items-center gap-2"><Eye size={16}/> Preview Tampilan Siswa</h4>
+                                        <div className="bg-white border-2 border-slate-200 p-6 rounded-3xl relative shadow-[0_8px_0_0_#E2E8F0]">
                                             
                                             {/* Stimulus Preview */}
                                             {stimulusType === 'text' && newStimulus && (
-                                                <div className="mb-4 p-4 bg-emerald-900/20 border border-emerald-500/30 rounded text-emerald-100/90 text-sm prose prose-invert max-w-none">
+                                                <div className="mb-6 p-6 bg-blue-50 border-2 border-blue-100 rounded-2xl text-slate-700 font-medium leading-relaxed">
                                                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newStimulus}</ReactMarkdown>
                                                 </div>
                                             )}
                                             {stimulusType === 'image' && newQuestionImage && (
-                                                <div className="mb-4 flex justify-center">
-                                                    <img src={newQuestionImage} alt="Stimulus" className="max-h-60 rounded border border-slate-600"/>
+                                                <div className="mb-6 rounded-2xl overflow-hidden border-2 border-slate-200 flex justify-center bg-slate-50 p-4">
+                                                    <img src={newQuestionImage} alt="Stimulus" className="max-h-60 object-contain"/>
                                                 </div>
                                             )}
                                             
                                             {/* Question Text Preview */}
-                                            <div className="text-white text-base mb-6 prose prose-invert max-w-none">
+                                            <div className="text-xl md:text-2xl font-bold text-slate-800 mb-8 leading-snug font-display">
                                                 <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newQuestionText || '(Teks Pertanyaan...)'}</ReactMarkdown>
                                             </div>
 
                                             {/* Options Preview */}
-                                            <div className="space-y-2">
+                                            <div className="space-y-3">
                                                 {manualType === QuestionType.SINGLE && newOptions.map((opt, i) => (
-                                                    <div key={i} className={`p-3 rounded border flex items-center gap-3 ${i === singleCorrectIndex ? 'bg-green-900/30 border-green-600' : 'bg-slate-800 border-slate-700'}`}>
-                                                        <div className={`w-6 h-6 flex items-center justify-center rounded font-bold text-xs ${i === singleCorrectIndex ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                                                    <div key={i} className={`p-4 rounded-xl border-2 flex items-center gap-4 ${i === singleCorrectIndex ? 'bg-blue-50 border-[#00A2FF] shadow-sm' : 'bg-white border-slate-200'}`}>
+                                                        <div className={`w-8 h-8 flex items-center justify-center rounded-lg font-black text-sm ${i === singleCorrectIndex ? 'bg-[#00A2FF] text-white' : 'bg-slate-100 text-slate-400'}`}>
                                                             {String.fromCharCode(65+i)}
                                                         </div>
-                                                        <div className="text-sm text-slate-300">
+                                                        <div className="text-sm font-bold text-slate-600 flex-1">
                                                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p:'span'}}>{opt}</ReactMarkdown>
                                                         </div>
-                                                        {i === singleCorrectIndex && <Check size={14} className="text-green-500 ml-auto"/>}
+                                                        {i === singleCorrectIndex && <Check size={18} className="text-[#00A2FF]"/>}
                                                     </div>
                                                 ))}
 
                                                 {manualType === QuestionType.COMPLEX && newOptions.map((opt, i) => (
-                                                    <div key={i} className={`p-3 rounded border flex items-center gap-3 ${complexCorrectIndices.includes(i) ? 'bg-blue-900/30 border-blue-600' : 'bg-slate-800 border-slate-700'}`}>
-                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${complexCorrectIndices.includes(i) ? 'bg-blue-600 border-blue-600' : 'border-slate-500'}`}>
-                                                            {complexCorrectIndices.includes(i) && <Check size={12} className="text-white"/>}
+                                                    <div key={i} className={`p-4 rounded-xl border-2 flex items-center gap-4 ${complexCorrectIndices.includes(i) ? 'bg-blue-50 border-[#00A2FF]' : 'bg-white border-slate-200'}`}>
+                                                        <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${complexCorrectIndices.includes(i) ? 'bg-[#00A2FF] border-[#00A2FF]' : 'border-slate-300'}`}>
+                                                            {complexCorrectIndices.includes(i) && <Check size={14} className="text-white" strokeWidth={4}/>}
                                                         </div>
-                                                        <div className="text-sm text-slate-300">
+                                                        <div className="text-sm font-bold text-slate-600">
                                                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p:'span'}}>{opt}</ReactMarkdown>
                                                         </div>
                                                     </div>
                                                 ))}
 
                                                 {manualType === QuestionType.MATCHING && (
-                                                    <div className="border border-slate-700 rounded overflow-hidden">
-                                                        <table className="w-full text-sm text-left text-slate-300">
-                                                            <thead className="bg-slate-800 text-xs uppercase">
+                                                    <div className="border-2 border-slate-200 rounded-xl overflow-hidden">
+                                                        <table className="w-full text-sm text-left text-slate-600">
+                                                            <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400">
                                                                 <tr>
-                                                                    <th className="px-3 py-2">Pernyataan</th>
-                                                                    <th className="px-3 py-2 text-center border-l border-slate-700">{newOptions[0] || 'Benar'}</th>
-                                                                    <th className="px-3 py-2 text-center border-l border-slate-700">{newOptions[1] || 'Salah'}</th>
+                                                                    <th className="px-4 py-3">Pernyataan</th>
+                                                                    <th className="px-4 py-3 text-center border-l-2 border-slate-100 bg-green-50 text-green-600">{newOptions[0] || 'Benar'}</th>
+                                                                    <th className="px-4 py-3 text-center border-l-2 border-slate-100 bg-red-50 text-red-600">{newOptions[1] || 'Salah'}</th>
                                                                 </tr>
                                                             </thead>
-                                                            <tbody className="divide-y divide-slate-700">
+                                                            <tbody className="divide-y divide-slate-100">
                                                                 {matchingPairs.map((pair, idx) => (
                                                                     <tr key={idx}>
-                                                                        <td className="px-3 py-2">
+                                                                        <td className="px-4 py-3 font-medium">
                                                                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p:'span'}}>{pair.left}</ReactMarkdown>
                                                                         </td>
-                                                                        <td className="px-3 py-2 text-center border-l border-slate-700 bg-slate-800/30">
-                                                                            {pair.right === newOptions[0] && <div className="w-3 h-3 bg-green-500 rounded-full mx-auto"></div>}
+                                                                        <td className="px-4 py-3 text-center border-l-2 border-slate-100">
+                                                                            {pair.right === newOptions[0] && <div className="w-4 h-4 bg-green-500 rounded-full mx-auto shadow-sm"></div>}
                                                                         </td>
-                                                                        <td className="px-3 py-2 text-center border-l border-slate-700 bg-slate-800/30">
-                                                                            {pair.right === newOptions[1] && <div className="w-3 h-3 bg-green-500 rounded-full mx-auto"></div>}
+                                                                        <td className="px-4 py-3 text-center border-l-2 border-slate-100">
+                                                                            {pair.right === newOptions[1] && <div className="w-4 h-4 bg-red-500 rounded-full mx-auto shadow-sm"></div>}
                                                                         </td>
                                                                     </tr>
                                                                 ))}
@@ -1227,9 +837,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         </div>
                                      </div>
 
-                                     <button onClick={handleSaveQuestionSlot} className="w-full bg-blue-600 text-white py-3 font-bold text-xs uppercase mt-4">Simpan Soal</button>
+                                     <button onClick={handleSaveQuestionSlot} className="w-full bg-[#00A2FF] text-white py-4 font-black text-lg uppercase tracking-widest mt-6 rounded-2xl shadow-[0_6px_0_0_#007ACC] active:shadow-none active:translate-y-2 transition-all border-b-4 border-blue-700">Simpan Soal</button>
                                  </div>
-                             ) : <p className="text-slate-500 text-center mt-10">Pilih nomor soal untuk mulai mengedit.</p>}
+                             ) : <div className="flex flex-col items-center justify-center h-full text-slate-300">
+                                    <Layout size={64} className="mb-4 opacity-50"/>
+                                    <p className="font-bold text-slate-400">Pilih nomor soal disebelah kiri untuk mulai mengedit.</p>
+                                 </div>}
                          </div>
                      </div>
                  )}
@@ -1239,74 +852,380 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
-  // (Exam Tab remains unchanged)
-  if (activeTab === 'exams') {
+  // EXAMS TAB
+  if (activeTab === 'exams' && userRole === Role.ADMIN) {
       return (
-          <div className="p-8 h-full flex flex-col">
-              <h2 className="text-2xl font-black text-white uppercase mb-6"><CalendarClock className="inline mr-2 text-yellow-500"/> Jadwal Ujian</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
-                  <div className="bg-slate-900 p-6 border border-white/10 h-fit">
-                      <h3 className="font-bold text-white mb-4">Buat Jadwal</h3>
-                      <input className="w-full bg-black p-2 mb-2 text-white border border-slate-700" placeholder="Nama Ujian" value={newExamTitle} onChange={e=>setNewExamTitle(e.target.value)}/>
-                      
-                      {/* NEW: Category Selector */}
-                      <div className="mb-2">
-                        <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block">Kategori</label>
-                        <select 
-                            className="w-full bg-black p-2 text-white border border-slate-700 text-sm" 
-                            value={newExamCategory} 
-                            onChange={e => {
-                                setNewExamCategory(e.target.value as QuestionCategory);
-                                setNewExamPacketId(''); // Reset packet selection when category changes
-                            }}
-                        >
-                            <option value={QuestionCategory.LITERASI}>Literasi</option>
-                            <option value={QuestionCategory.NUMERASI}>Numerasi</option>
-                        </select>
-                      </div>
+        <div className="p-8 h-full flex flex-col bg-[#F2F4F8] text-slate-800">
+            <h2 className="text-2xl font-black uppercase mb-6 flex items-center gap-2"><CalendarClock className="text-[#00A2FF]"/> Jadwal Ujian</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden min-h-0">
+                <div className="bg-white p-6 rounded-3xl border-2 border-slate-200 h-fit shadow-sm">
+                    <h3 className="text-sm font-black uppercase text-slate-800 mb-4">Buat Jadwal Baru</h3>
+                    <input className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl mb-3 text-sm font-bold outline-none focus:border-[#00A2FF]" placeholder="Judul Ujian" value={newExamTitle} onChange={e => setNewExamTitle(e.target.value)} />
+                    
+                    <div className="mb-3">
+                        <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Waktu Pelaksanaan (Akses Dibuka - Ditutup)</label>
+                        <div className="grid grid-cols-2 gap-2">
+                             <input type="datetime-local" className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl text-xs font-bold outline-none focus:border-[#00A2FF]" value={newExamStart} onChange={e => setNewExamStart(e.target.value)} />
+                             <input type="datetime-local" className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl text-xs font-bold outline-none focus:border-[#00A2FF]" value={newExamEnd} onChange={e => setNewExamEnd(e.target.value)} />
+                        </div>
+                    </div>
 
-                      <div className="mb-2">
-                        <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block">Pilih Paket Soal</label>
-                        <select 
-                            className="w-full bg-black p-2 text-white border border-slate-700 text-sm" 
-                            value={newExamPacketId} 
-                            onChange={e=>setNewExamPacketId(e.target.value)}
-                        >
-                            <option value="">-- Pilih Paket {newExamCategory} --</option>
-                            {visiblePackets
-                                .filter(p => p.category === newExamCategory) // Apply filter based on selected category
-                                .map(p=><option key={p.id} value={p.id}>{p.name} ({p.totalQuestions} Soal)</option>)
-                            }
-                        </select>
-                      </div>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Paket Soal</label>
+                            <select className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl text-sm font-bold outline-none focus:border-[#00A2FF]" value={newExamPacketId} onChange={e => setNewExamPacketId(e.target.value)}>
+                                <option value="">Pilih Paket Soal</option>
+                                {visiblePackets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Durasi (Menit)</label>
+                            <input type="number" className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl text-sm font-bold outline-none focus:border-[#00A2FF]" placeholder="Contoh: 120" value={newExamDuration} onChange={e => setNewExamDuration(parseInt(e.target.value))} />
+                        </div>
+                    </div>
 
-                      <div className="flex gap-2 mb-2"><input type="datetime-local" className="bg-black text-white text-xs p-1 w-1/2" value={newExamStart} onChange={e=>setNewExamStart(e.target.value)}/><input type="datetime-local" className="bg-black text-white text-xs p-1 w-1/2" value={newExamEnd} onChange={e=>setNewExamEnd(e.target.value)}/></div>
-                      <div className="mb-2"><input type="number" className="bg-black text-white text-xs p-2 w-full border border-slate-700" placeholder="Durasi (Menit)" value={newExamDuration} onChange={e=>setNewExamDuration(parseInt(e.target.value))}/></div>
-                      <div className="grid grid-cols-3 gap-2 mb-4">{CLASS_LIST.map(c=><button key={c} onClick={()=>{if(newExamClasses.includes(c))setNewExamClasses(newExamClasses.filter(x=>x!==c));else setNewExamClasses([...newExamClasses,c])}} className={`text-[10px] border p-1 ${newExamClasses.includes(c)?'bg-yellow-600 text-black':'text-slate-400'}`}>{c}</button>)}</div>
-                      <button onClick={handleCreateExam} className="w-full bg-blue-600 text-white py-2 font-bold">Jadwalkan</button>
-                  </div>
-                  <div className="lg:col-span-2 overflow-auto space-y-3">
-                      {visibleExams.map(e => {
-                          const pkt = packets.find(p => p.id === e.packetId);
-                          return (
-                              <div key={e.id} className={`bg-slate-900 border p-4 flex justify-between ${e.isActive?'border-green-500':'border-slate-700'}`}>
-                                  <div>
-                                      <h4 className="font-bold text-white text-lg">{e.title}</h4>
-                                      <div className="flex items-center gap-2 mb-1 mt-1">
-                                          <span className="bg-yellow-900 text-yellow-500 border border-yellow-700 px-2 py-0.5 text-[10px] uppercase font-bold rounded">{pkt?.name || 'Paket Tidak Dikenal'}</span>
-                                          <span className="bg-purple-900 text-purple-400 border border-purple-700 px-2 py-0.5 text-[10px] uppercase font-bold rounded">{pkt?.category || '-'}</span>
-                                      </div>
-                                      <p className="text-xs text-slate-400 mb-1">{e.classTarget.join(', ')} <span className="text-slate-600 mx-2">|</span> {e.durationMinutes} Menit</p>
-                                      <p className="text-[10px] text-slate-500 font-mono">{formatDateRange(e.scheduledStart, e.scheduledEnd)}</p>
-                                  </div>
-                                  <div className="flex gap-2 items-start">
-                                      <button onClick={()=>toggleExamStatus(e.id)} className={`text-xs px-2 py-1 ${e.isActive?'bg-red-900 text-red-400':'bg-green-900 text-green-400'}`}>{e.isActive?'STOP':'START'}</button>
-                                      <button onClick={()=>handleDeleteExam(e.id)} className="text-red-500"><Trash2 size={16}/></button>
-                                  </div>
+                    <div className="mb-4">
+                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Target Kelas</label>
+                        <div className="flex flex-wrap gap-2">
+                            {CLASS_LIST.map(c => (
+                                <button key={c} onClick={() => {
+                                    if(newExamClasses.includes(c)) setNewExamClasses(newExamClasses.filter(x => x !== c));
+                                    else setNewExamClasses([...newExamClasses, c]);
+                                }} className={`px-3 py-1 rounded-lg text-xs font-bold border-2 transition-all ${newExamClasses.includes(c) ? 'bg-[#00A2FF] text-white border-blue-600' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                    {c}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <button onClick={handleCreateExam} className="w-full bg-[#00B06F] text-white py-3 font-black rounded-xl uppercase tracking-wider btn-3d border-b-green-700">Jadwalkan</button>
+                </div>
+
+                <div className="lg:col-span-2 overflow-y-auto space-y-3 pr-2">
+                    {exams.map(exam => {
+                        const isActive = exam.isActive;
+                        return (
+                            <div key={exam.id} className="bg-white p-4 rounded-2xl border-2 border-slate-200 flex justify-between items-center group hover:border-[#00A2FF] transition-all shadow-sm">
+                                <div>
+                                    <h4 className="font-black text-slate-800 text-lg uppercase">{exam.title}</h4>
+                                    <div className="flex items-center gap-3 text-xs font-bold text-slate-500 mt-1">
+                                        <span className="flex items-center gap-1"><Clock size={12}/> {exam.durationMinutes} Menit</span>
+                                        <span className="flex items-center gap-1"><Users size={12}/> {exam.classTarget.join(', ')}</span>
+                                        <span className={`px-2 py-0.5 rounded ${isActive ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'}`}>{isActive ? 'AKTIF' : 'NON-AKTIF'}</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-2 font-mono uppercase">{formatDateRange(exam.scheduledStart, exam.scheduledEnd)}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => toggleExamStatus(exam.id)} className={`p-3 rounded-xl transition-colors ${isActive ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-green-50 text-green-500 hover:bg-green-100'}`}>
+                                        {isActive ? <StopCircle size={20}/> : <PlayCircle size={20}/>}
+                                    </button>
+                                    <button onClick={() => handleDeleteExam(exam.id)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-500 transition-colors">
+                                        <Trash2 size={20}/>
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    })}
+                    {exams.length === 0 && <div className="text-center p-8 text-slate-400 font-bold italic border-2 border-dashed border-slate-200 rounded-2xl">Belum ada jadwal ujian.</div>}
+                </div>
+            </div>
+        </div>
+      );
+  }
+
+  // MONITORING TAB
+  if (activeTab === 'monitor' && userRole === Role.ADMIN) {
+      const selectedExamData = exams.find(e => e.id === selectedExamForMonitor);
+      
+      // Filter results for this exam
+      const resultsForExam = examResults.filter(r => r.examId === selectedExamForMonitor);
+      
+      // Get all eligible students
+      let eligibleStudents = students.filter(s => selectedExamData?.classTarget.includes(s.class));
+      if (monitoringClassFilter) eligibleStudents = eligibleStudents.filter(s => s.class === monitoringClassFilter);
+
+      // Map status
+      const monitorData = eligibleStudents.map(s => {
+          const res = resultsForExam.find(r => r.studentId === s.id);
+          const isDone = !!res;
+          // In real-time scenario, we would need a 'working' status from server.
+          // For now, we only know Done or Not Started (or we assume working if not done but active).
+          return { student: s, result: res, status: isDone ? 'SELESAI' : 'BELUM' };
+      });
+      
+      // Filter by status
+      const displayedMonitorData = monitorData.filter(d => {
+          if (monitoringStatusFilter === 'all') return true;
+          if (monitoringStatusFilter === 'finished') return d.status === 'SELESAI';
+          if (monitoringStatusFilter === 'unfinished') return d.status === 'BELUM';
+          if (monitoringStatusFilter === 'suspicious') return d.result?.violationCount && d.result.violationCount > 0;
+          return true;
+      });
+
+      return (
+          <div className="p-8 h-full flex flex-col bg-[#F2F4F8] text-slate-800">
+               <div className="flex justify-between items-center mb-6">
+                   <h2 className="text-2xl font-black uppercase flex items-center gap-2"><Activity className="text-[#00A2FF]"/> Live Monitoring</h2>
+                   <select className="bg-white border-2 border-slate-200 p-2 rounded-xl text-sm font-bold outline-none focus:border-[#00A2FF]" value={selectedExamForMonitor} onChange={e => setSelectedExamForMonitor(e.target.value)}>
+                       <option value="">-- PILIH UJIAN --</option>
+                       {visibleExams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
+                   </select>
+               </div>
+
+               {selectedExamForMonitor ? (
+                   <>
+                       <div className="grid grid-cols-4 gap-4 mb-6">
+                           <div className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm">
+                               <p className="text-xs font-black text-slate-400 uppercase">Total Peserta</p>
+                               <p className="text-2xl font-black text-slate-800">{monitorData.length}</p>
+                           </div>
+                           <div className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm">
+                               <p className="text-xs font-black text-slate-400 uppercase">Selesai</p>
+                               <p className="text-2xl font-black text-green-500">{monitorData.filter(d=>d.status==='SELESAI').length}</p>
+                           </div>
+                           <div className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm">
+                               <p className="text-xs font-black text-slate-400 uppercase">Belum Selesai</p>
+                               <p className="text-2xl font-black text-red-500">{monitorData.filter(d=>d.status==='BELUM').length}</p>
+                           </div>
+                           <div className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm">
+                               <p className="text-xs font-black text-slate-400 uppercase">Rata-rata Nilai</p>
+                               <p className="text-2xl font-black text-blue-500">
+                                   {resultsForExam.length > 0 ? (resultsForExam.reduce((a,b)=>a+b.score,0)/resultsForExam.length).toFixed(1) : '0'}
+                               </p>
+                           </div>
+                       </div>
+
+                       <div className="flex gap-2 mb-4">
+                           <button onClick={() => setMonitoringStatusFilter('all')} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all ${monitoringStatusFilter==='all'?'bg-slate-800 text-white':'bg-white text-slate-500 border border-slate-200'}`}>Semua</button>
+                           <button onClick={() => setMonitoringStatusFilter('finished')} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all ${monitoringStatusFilter==='finished'?'bg-green-600 text-white':'bg-white text-slate-500 border border-slate-200'}`}>Selesai</button>
+                           <button onClick={() => setMonitoringStatusFilter('unfinished')} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all ${monitoringStatusFilter==='unfinished'?'bg-red-500 text-white':'bg-white text-slate-500 border border-slate-200'}`}>Belum</button>
+                           <button onClick={() => setMonitoringStatusFilter('suspicious')} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all ${monitoringStatusFilter==='suspicious'?'bg-orange-500 text-white':'bg-white text-slate-500 border border-slate-200'}`}>Pelanggaran</button>
+                           
+                           <div className="ml-auto">
+                               <select className="bg-white border-2 border-slate-200 p-2 rounded-xl text-xs font-bold outline-none" value={monitoringClassFilter} onChange={e => setMonitoringClassFilter(e.target.value)}>
+                                   <option value="">Semua Kelas</option>
+                                   {selectedExamData?.classTarget.map(c => <option key={c} value={c}>{c}</option>)}
+                               </select>
+                           </div>
+                       </div>
+
+                       <div className="bg-white rounded-2xl border-2 border-slate-200 flex-1 overflow-hidden shadow-sm">
+                           <div className="overflow-auto h-full">
+                               <table className="w-full text-left">
+                                   <thead className="bg-slate-50 sticky top-0">
+                                       <tr>
+                                           <th className="p-4 text-xs font-black text-slate-400 uppercase border-b border-slate-200">Peserta</th>
+                                           <th className="p-4 text-xs font-black text-slate-400 uppercase border-b border-slate-200">Kelas</th>
+                                           <th className="p-4 text-xs font-black text-slate-400 uppercase border-b border-slate-200 text-center">Status</th>
+                                           <th className="p-4 text-xs font-black text-slate-400 uppercase border-b border-slate-200 text-center">Nilai</th>
+                                           <th className="p-4 text-xs font-black text-slate-400 uppercase border-b border-slate-200 text-center">Info</th>
+                                           <th className="p-4 text-xs font-black text-slate-400 uppercase border-b border-slate-200 text-center">Aksi</th>
+                                       </tr>
+                                   </thead>
+                                   <tbody className="divide-y divide-slate-100">
+                                       {displayedMonitorData.map((d, idx) => (
+                                           <tr key={idx} className="hover:bg-slate-50">
+                                               <td className="p-4 text-sm font-bold text-slate-800">{d.student.name}</td>
+                                               <td className="p-4 text-sm font-bold text-slate-500">{d.student.class}</td>
+                                               <td className="p-4 text-center">
+                                                   <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${d.status==='SELESAI'?'bg-green-100 text-green-600':'bg-slate-100 text-slate-400'}`}>{d.status}</span>
+                                               </td>
+                                               <td className="p-4 text-center text-sm font-black text-slate-800">{d.result ? d.result.score.toFixed(0) : '-'}</td>
+                                               <td className="p-4 text-center">
+                                                   {d.result?.violationCount ? (
+                                                       <span className="text-red-500 font-bold text-xs flex items-center justify-center gap-1"><AlertTriangle size={12}/> {d.result.violationCount}x</span>
+                                                   ) : <span className="text-green-500 text-xs font-bold">Aman</span>}
+                                               </td>
+                                               <td className="p-4 text-center">
+                                                   <button className="text-xs font-bold text-blue-500 hover:text-blue-700 underline">Reset Login</button>
+                                               </td>
+                                           </tr>
+                                       ))}
+                                   </tbody>
+                               </table>
+                           </div>
+                       </div>
+                   </>
+               ) : (
+                   <div className="flex-1 flex items-center justify-center text-slate-400 font-bold italic border-2 border-dashed border-slate-200 rounded-3xl">Pilih ujian untuk memantau.</div>
+               )}
+          </div>
+      );
+  }
+
+  // ANALYSIS TAB
+  if (activeTab === 'analysis') {
+      return (
+          <div className="p-8 h-full flex flex-col bg-[#F2F4F8] text-slate-800">
+              <div className="flex justify-between items-center mb-6">
+                   <h2 className="text-2xl font-black uppercase flex items-center gap-2"><BarChart2 className="text-[#00A2FF]"/> Analisis Hasil</h2>
+                   <div className="flex gap-4">
+                       <select className="bg-white border-2 border-slate-200 p-2 rounded-xl text-sm font-bold outline-none focus:border-[#00A2FF]" value={selectedExamIdForAnalysis} onChange={e => setSelectedExamIdForAnalysis(e.target.value)}>
+                           <option value="">-- PILIH UJIAN --</option>
+                           {visibleExams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
+                       </select>
+                   </div>
+               </div>
+
+               {selectedExamIdForAnalysis && selectedExamForAnalysis ? (
+                   <>
+                       <div className="flex gap-2 mb-4 bg-white p-1 rounded-xl w-fit border border-slate-200">
+                           <button onClick={() => setAnalysisSubTab('item')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${analysisSubTab==='item'?'bg-[#00A2FF] text-white shadow-md':'text-slate-400 hover:text-slate-600'}`}>Analisis Butir Soal</button>
+                           <button onClick={() => setAnalysisSubTab('recap')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${analysisSubTab==='recap'?'bg-[#00A2FF] text-white shadow-md':'text-slate-400 hover:text-slate-600'}`}>Rekap Nilai</button>
+                       </div>
+
+                       <div className="bg-white rounded-3xl border-2 border-slate-200 flex-1 overflow-hidden shadow-sm flex flex-col">
+                           {analysisSubTab === 'item' && (
+                               <div className="flex-1 flex flex-col">
+                                   <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                                       <h3 className="text-sm font-black text-slate-600 uppercase">Analisis Per Soal</h3>
+                                       <button onClick={handleDownloadAnalysisExcel} className="flex items-center gap-2 text-green-600 font-bold text-xs uppercase hover:bg-green-50 px-3 py-1 rounded-lg transition-colors"><FileSpreadsheet size={16}/> Download Excel</button>
+                                   </div>
+                                   <div className="flex-1 overflow-auto p-4">
+                                       <table className="w-full text-left text-sm">
+                                           <thead className="bg-slate-100 text-slate-500 uppercase font-bold text-xs">
+                                               <tr>
+                                                   <th className="p-3 rounded-l-lg">No</th>
+                                                   <th className="p-3 w-1/3">Pertanyaan</th>
+                                                   <th className="p-3 text-center">Tingkat Kesukaran</th>
+                                                   <th className="p-3 text-center">Daya Pembeda</th>
+                                                   <th className="p-3 text-center bg-green-50 text-green-600 rounded-r-lg">% Menjawab Benar</th>
+                                               </tr>
+                                           </thead>
+                                           <tbody className="divide-y divide-slate-100">
+                                               {selectedExamForAnalysis.questions.map((q, idx) => {
+                                                   const stats = getItemAnalysis(q.id, q);
+                                                   let difficulty = "Sedang";
+                                                   if (stats.correctRate > 80) difficulty = "Mudah";
+                                                   if (stats.correctRate < 30) difficulty = "Sukar";
+                                                   
+                                                   return (
+                                                       <tr key={q.id}>
+                                                           <td className="p-3 font-bold text-slate-400">{idx+1}</td>
+                                                           <td className="p-3 font-medium text-slate-700 truncate max-w-xs">{q.text.substring(0, 100)}...</td>
+                                                           <td className="p-3 text-center">
+                                                               <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${difficulty==='Mudah'?'bg-green-100 text-green-600':difficulty==='Sukar'?'bg-red-100 text-red-600':'bg-yellow-100 text-yellow-600'}`}>{difficulty}</span>
+                                                           </td>
+                                                           <td className="p-3 text-center font-mono text-slate-500">-</td>
+                                                           <td className="p-3 text-center font-black text-slate-800">{stats.correctRate.toFixed(1)}%</td>
+                                                       </tr>
+                                                   )
+                                               })}
+                                           </tbody>
+                                       </table>
+                                   </div>
+                               </div>
+                           )}
+
+                           {analysisSubTab === 'recap' && (
+                               <div className="flex-1 flex flex-col">
+                                   <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                                       <h3 className="text-sm font-black text-slate-600 uppercase">Rekapitulasi Nilai Siswa</h3>
+                                       <button onClick={handleDownloadRecapExcel} className="flex items-center gap-2 text-green-600 font-bold text-xs uppercase hover:bg-green-50 px-3 py-1 rounded-lg transition-colors"><FileSpreadsheet size={16}/> Download Excel</button>
+                                   </div>
+                                   <div className="flex-1 overflow-auto p-4">
+                                       <table className="w-full text-left text-sm">
+                                           <thead className="bg-slate-100 text-slate-500 uppercase font-bold text-xs">
+                                               <tr>
+                                                   <th className="p-3 rounded-l-lg">Peringkat</th>
+                                                   <th className="p-3">Nama Siswa</th>
+                                                   <th className="p-3 text-center">Kelas</th>
+                                                   <th className="p-3 text-center">Waktu Submit</th>
+                                                   <th className="p-3 text-center bg-blue-50 text-blue-600 rounded-r-lg">Nilai Akhir</th>
+                                               </tr>
+                                           </thead>
+                                           <tbody className="divide-y divide-slate-100">
+                                               {examResults
+                                                 .filter(r => r.examId === selectedExamIdForAnalysis)
+                                                 .sort((a,b) => b.score - a.score)
+                                                 .map((r, idx) => (
+                                                   <tr key={r.id}>
+                                                       <td className="p-3 text-center font-black text-slate-400">{idx+1}</td>
+                                                       <td className="p-3 font-bold text-slate-800">{r.studentName}</td>
+                                                       <td className="p-3 text-center font-bold text-slate-500">{r.studentClass}</td>
+                                                       <td className="p-3 text-center font-mono text-xs text-slate-400">{new Date(r.timestamp).toLocaleString()}</td>
+                                                       <td className="p-3 text-center font-black text-xl text-blue-600">{r.score.toFixed(0)}</td>
+                                                   </tr>
+                                               ))}
+                                               {examResults.filter(r => r.examId === selectedExamIdForAnalysis).length === 0 && (
+                                                   <tr><td colSpan={5} className="p-8 text-center text-slate-400 italic">Belum ada data nilai.</td></tr>
+                                               )}
+                                           </tbody>
+                                       </table>
+                                   </div>
+                               </div>
+                           )}
+                       </div>
+                   </>
+               ) : (
+                   <div className="flex-1 flex items-center justify-center text-slate-400 font-bold italic border-2 border-dashed border-slate-200 rounded-3xl">Pilih ujian untuk melihat analisis.</div>
+               )}
+          </div>
+      );
+  }
+
+  // SETTINGS TAB
+  if (activeTab === 'settings' && userRole === Role.ADMIN) {
+      return (
+          <div className="p-8 h-full flex flex-col bg-[#F2F4F8] text-slate-800">
+              <h2 className="text-2xl font-black uppercase mb-6 flex items-center gap-2"><Settings className="text-[#00A2FF]"/> Pengaturan Sekolah</h2>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="bg-white p-8 rounded-3xl border-2 border-slate-200 shadow-sm">
+                      <h3 className="text-lg font-black text-slate-800 uppercase mb-6 flex items-center gap-2"><AlignLeft size={20}/> Identitas Aplikasi</h3>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Nama Sekolah</label>
+                              <input className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={schoolSettings?.schoolName} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, schoolName: e.target.value})} />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Judul Aplikasi CBT</label>
+                              <input className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={schoolSettings?.cbtTitle} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, cbtTitle: e.target.value})} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Tahun Ajaran</label>
+                                  <input className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={schoolSettings?.academicYear} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, academicYear: e.target.value})} />
                               </div>
-                          );
-                      })}
+                              <div>
+                                  <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Semester</label>
+                                  <input className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={schoolSettings?.semester} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, semester: e.target.value})} />
+                              </div>
+                          </div>
+                      </div>
                   </div>
+
+                  <div className="bg-white p-8 rounded-3xl border-2 border-slate-200 shadow-sm">
+                      <h3 className="text-lg font-black text-slate-800 uppercase mb-6 flex items-center gap-2"><Key size={20}/> Keamanan & Akses</h3>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Password Admin Utama</label>
+                              <input type="password" className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={schoolSettings?.adminPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, adminPassword: e.target.value})} />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Password Guru Literasi</label>
+                              <input type="password" className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={schoolSettings?.teacherLiterasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherLiterasiPassword: e.target.value})} />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Password Guru Numerasi</label>
+                              <input type="password" className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-[#00A2FF]" value={schoolSettings?.teacherNumerasiPassword} onChange={e => setSchoolSettings && setSchoolSettings({...schoolSettings!, teacherNumerasiPassword: e.target.value})} />
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div className="bg-white p-8 rounded-3xl border-2 border-slate-200 shadow-sm lg:col-span-2">
+                      <h3 className="text-lg font-black text-slate-800 uppercase mb-6 flex items-center gap-2"><RefreshCcw size={20}/> Server Sinkronisasi</h3>
+                      <div>
+                          <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Google Apps Script Web App URL</label>
+                          <input className="w-full bg-slate-50 border-2 border-slate-200 p-3 rounded-xl font-mono text-xs text-slate-600 outline-none focus:border-[#00A2FF]" value={currentScriptUrl} onChange={e => onUpdateScriptUrl && onUpdateScriptUrl(e.target.value)} placeholder="https://script.google.com/..." />
+                          <p className="text-[10px] text-slate-400 mt-2 font-bold">Pastikan script dideploy sebagai Web App dengan akses 'Anyone'.</p>
+                      </div>
+                  </div>
+              </div>
+              
+              <div className="mt-8 flex justify-end">
+                  <button onClick={() => { onSyncData && onSyncData(); alert("Pengaturan disimpan!"); }} className="bg-[#00B06F] text-white px-8 py-4 rounded-xl font-black uppercase text-lg shadow-lg hover:bg-[#009e63] btn-3d border-b-green-700 flex items-center gap-2"><Save size={20}/> Simpan Semua Pengaturan</button>
               </div>
           </div>
       );
