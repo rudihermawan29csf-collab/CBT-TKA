@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: SchoolSettings = {
 
 // --- CONFIGURATION ---
 // Default URL if not set in LocalStorage
-const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwiI1HFdBD-ai0nV9VudBp4XCn__wiqq1AIQ6iJ-dHzcYzey_LTCEPNNoDPmjEjjllc0Q/exec"; 
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxL7lY6k-DcV2yGsohpAF04k1h3YzYQmsKGa5q9waoH2cd2P1sMYtx4nSr_Z4YqyeioQw/exec"; 
 
 const App = () => {
   // Helper hook for localStorage persistence
@@ -48,13 +48,13 @@ const App = () => {
   // Dynamic Script URL State
   // CHANGED STORAGE KEY TO FORCE UPDATE FOR USER
   const [scriptUrl, setScriptUrl] = useState<string>(() => {
-      const stored = localStorage.getItem('cbt_script_url_v2');
+      const stored = localStorage.getItem('cbt_script_url_v3');
       return stored || DEFAULT_SCRIPT_URL;
   });
 
   // Save URL change to localStorage
   useEffect(() => {
-      localStorage.setItem('cbt_script_url_v2', scriptUrl);
+      localStorage.setItem('cbt_script_url_v3', scriptUrl);
   }, [scriptUrl]);
 
   // Global App State
@@ -678,6 +678,5 @@ const App = () => {
   );
 };
 
-const container = document.getElementById('root');
-const root = createRoot(container!);
+const root = createRoot(document.getElementById('root')!);
 root.render(<App />);

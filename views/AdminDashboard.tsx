@@ -597,7 +597,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <button 
                                 onClick={() => {
                                     if(confirm("Reset URL ke default?")) {
-                                        onUpdateScriptUrl && onUpdateScriptUrl("https://script.google.com/macros/s/AKfycbwiI1HFdBD-ai0nV9VudBp4XCn__wiqq1AIQ6iJ-dHzcYzey_LTCEPNNoDPmjEjjllc0Q/exec");
+                                        onUpdateScriptUrl && onUpdateScriptUrl("https://script.google.com/macros/s/AKfycbxL7lY6k-DcV2yGsohpAF04k1h3YzYQmsKGa5q9waoH2cd2P1sMYtx4nSr_Z4YqyeioQw/exec");
                                     }
                                 }}
                                 className="px-3 bg-slate-700 hover:bg-slate-600 text-white rounded border border-slate-600"
@@ -631,10 +631,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
       );
   }
-
-  // ... (Rest of the component remains largely the same, skipping unchanged parts for brevity)
-  // Need to return null for unhandled tabs to keep TypeScript happy if I don't paste the whole file
-  // However, I will paste the whole file content in the XML to ensure correctness.
 
   // DATA SISWA
   if (activeTab === 'students') {
@@ -1150,6 +1146,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                  </div>
                                              </div>
                                          )}
+                                     </div>
+
+                                     {/* --- PREVIEW SECTION --- */}
+                                     <div className="mt-8 pt-8 border-t border-slate-700">
+                                        <h4 className="text-yellow-500 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2"><Eye size={16}/> Preview Tampilan Siswa</h4>
+                                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-lg relative">
+                                            
+                                            {/* Stimulus Preview */}
+                                            {stimulusType === 'text' && newStimulus && (
+                                                <div className="mb-4 p-4 bg-emerald-900/20 border border-emerald-500/30 rounded text-emerald-100/90 text-sm prose prose-invert max-w-none">
+                                                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newStimulus}</ReactMarkdown>
+                                                </div>
+                                            )}
+                                            {stimulusType === 'image' && newQuestionImage && (
+                                                <div className="mb-4 flex justify-center">
+                                                    <img src={newQuestionImage} alt="Stimulus" className="max-h-60 rounded border border-slate-600"/>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Question Text Preview */}
+                                            <div className="text-white text-base mb-6 prose prose-invert max-w-none">
+                                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{newQuestionText || '(Teks Pertanyaan...)'}</ReactMarkdown>
+                                            </div>
+
+                                            {/* Options Preview */}
+                                            <div className="space-y-2">
+                                                {manualType === QuestionType.SINGLE && newOptions.map((opt, i) => (
+                                                    <div key={i} className={`p-3 rounded border flex items-center gap-3 ${i === singleCorrectIndex ? 'bg-green-900/30 border-green-600' : 'bg-slate-800 border-slate-700'}`}>
+                                                        <div className={`w-6 h-6 flex items-center justify-center rounded font-bold text-xs ${i === singleCorrectIndex ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                                                            {String.fromCharCode(65+i)}
+                                                        </div>
+                                                        <div className="text-sm text-slate-300">
+                                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p:'span'}}>{opt}</ReactMarkdown>
+                                                        </div>
+                                                        {i === singleCorrectIndex && <Check size={14} className="text-green-500 ml-auto"/>}
+                                                    </div>
+                                                ))}
+
+                                                {manualType === QuestionType.COMPLEX && newOptions.map((opt, i) => (
+                                                    <div key={i} className={`p-3 rounded border flex items-center gap-3 ${complexCorrectIndices.includes(i) ? 'bg-blue-900/30 border-blue-600' : 'bg-slate-800 border-slate-700'}`}>
+                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${complexCorrectIndices.includes(i) ? 'bg-blue-600 border-blue-600' : 'border-slate-500'}`}>
+                                                            {complexCorrectIndices.includes(i) && <Check size={12} className="text-white"/>}
+                                                        </div>
+                                                        <div className="text-sm text-slate-300">
+                                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p:'span'}}>{opt}</ReactMarkdown>
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {manualType === QuestionType.MATCHING && (
+                                                    <div className="border border-slate-700 rounded overflow-hidden">
+                                                        <table className="w-full text-sm text-left text-slate-300">
+                                                            <thead className="bg-slate-800 text-xs uppercase">
+                                                                <tr>
+                                                                    <th className="px-3 py-2">Pernyataan</th>
+                                                                    <th className="px-3 py-2 text-center border-l border-slate-700">{newOptions[0] || 'Benar'}</th>
+                                                                    <th className="px-3 py-2 text-center border-l border-slate-700">{newOptions[1] || 'Salah'}</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-700">
+                                                                {matchingPairs.map((pair, idx) => (
+                                                                    <tr key={idx}>
+                                                                        <td className="px-3 py-2">
+                                                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{p:'span'}}>{pair.left}</ReactMarkdown>
+                                                                        </td>
+                                                                        <td className="px-3 py-2 text-center border-l border-slate-700 bg-slate-800/30">
+                                                                            {pair.right === newOptions[0] && <div className="w-3 h-3 bg-green-500 rounded-full mx-auto"></div>}
+                                                                        </td>
+                                                                        <td className="px-3 py-2 text-center border-l border-slate-700 bg-slate-800/30">
+                                                                            {pair.right === newOptions[1] && <div className="w-3 h-3 bg-green-500 rounded-full mx-auto"></div>}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                      </div>
 
                                      <button onClick={handleSaveQuestionSlot} className="w-full bg-blue-600 text-white py-3 font-bold text-xs uppercase mt-4">Simpan Soal</button>
